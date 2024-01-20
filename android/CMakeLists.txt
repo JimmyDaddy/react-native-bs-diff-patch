@@ -4,12 +4,15 @@ project(BsDiffPatch)
 set (CMAKE_VERBOSE_MAKEFILE ON)
 set (CMAKE_CXX_STANDARD 11)
 
+file(GLOB_RECURSE SOURCES "../cpp/*.c" "../cpp/*.cpp" "../cpp/bzlib/*.c" "../cpp/bzlib/*.cpp")
+
 add_library(react-native-bs-diff-patch            SHARED
-            ../cpp/react-native-bs-diff-patch.cpp
+            ${SOURCES}
             cpp-adapter.cpp
 )
 
 # Specifies a path to native header files.
 include_directories(
             ../cpp
+            ../cpp/bzlib
 )

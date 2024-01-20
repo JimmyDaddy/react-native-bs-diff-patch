@@ -1,7 +1,16 @@
-#include "react-native-bs-diff-patch.h"
+
+extern "C" {
+  #include "bsdiff.h"
+  #include "bspatch.h"
+}
 
 namespace bsdiffpatch {
-	double multiply(double a, double b) {
-		return a * b;
-	}
+
+  int diffFile(const char* oldFile, const char* newFile, const char* patchFile) {
+    return bsDiffFile(oldFile, newFile, patchFile);
+  }
+
+  int patchFile(const char* oldFile, const char* newFile, const char* patchFile) {
+    return bsPatchFile(oldFile, newFile, patchFile);
+  }
 }

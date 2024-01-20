@@ -17,6 +17,18 @@ const BsDiffPatch = NativeModules.BsDiffPatch
       }
     );
 
-export function multiply(a: number, b: number): Promise<number> {
-  return BsDiffPatch.multiply(a, b);
+export function patch(
+  oldFile: string,
+  newFile: string,
+  patchFile: string
+): Promise<number> {
+  return BsDiffPatch.patch(oldFile, newFile, patchFile);
+}
+
+export function diff(
+  oldFile: string,
+  newFile: string,
+  patchFile: string
+): Promise<number> {
+  return BsDiffPatch.diff(oldFile, newFile, patchFile);
 }

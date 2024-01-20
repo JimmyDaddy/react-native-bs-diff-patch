@@ -2,7 +2,8 @@
 #define BSDIFFPATCH_H
 
 namespace bsdiffpatch {
-  double multiply(double a, double b);
+  int diffFile(const char* oldFile, const char* newFile, const char* patchFile);
+  int patchFile(const char* oldFile, const char* newFile, const char* patchFile);
 }
 
 #endif /* BSDIFFPATCH_H */
