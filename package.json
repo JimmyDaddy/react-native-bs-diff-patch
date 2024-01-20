@@ -1,6 +1,6 @@
 {
   "name": "react-native-bs-diff-patch",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "rn bs diff patch ",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
