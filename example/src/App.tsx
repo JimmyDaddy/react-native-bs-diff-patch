@@ -2,55 +2,48 @@ import * as React from 'react';
 
 import { StyleSheet, View, Text } from 'react-native';
 import { diff, patch } from 'react-native-bs-diff-patch';
-import * as FS from 'expo-file-system';
+import * as FS from 'react-native-fs';
 
 export default function App() {
-  const newFile = FS.documentDirectory + 'test1.txt';
-  const oldFile = FS.documentDirectory + 'test.txt';
-  const patchFile = FS.documentDirectory + 'patch.txt';
-  const newFile1 = FS.documentDirectory + 'test2.txt';
+  const newFile = FS.DocumentDirectoryPath + 'test1.txt';
+  const oldFile = FS.DocumentDirectoryPath + 'test.txt';
+  const patchFile = FS.DocumentDirectoryPath + 'patch.txt';
+  const newFile1 = FS.DocumentDirectoryPath + 'test2.txt';
 
   const [textLength, setTextLength] = React.useState<number | undefined>();
   const [patchFileUri, setPatchFileUri] = React.useState<string | undefined>();
 
   React.useEffect(() => {
-    FS.writeAsStringAsync(
-      FS.documentDirectory + 'test.txt',
-      new Array(10000).fill('Hello World').join(' | '),
-      {
-        encoding: FS.EncodingType.UTF8,
-      }
+    FS.writeFile(
+      FS.DocumentDirectoryPath + 'test.txt',
+      new Array(10000).fill('Hello World').join(' | ')
     )
       .then(async () => {
         try {
-          await FS.writeAsStringAsync(
-            FS.documentDirectory + 'test1.txt',
-            new Array(10000).fill('Hello World 1').join(' | '),
-            {
-              encoding: FS.EncodingType.UTF8,
-            }
+          await FS.writeFile(
+            FS.DocumentDirectoryPath + 'test1.txt',
+            new Array(10000).fill('Hello World 1').join(' | ')
           );
 
-          let patchFileInfoInner = await FS.getInfoAsync(patchFile);
+          let patchFileExists = await FS.exists(patchFile);
 
-          if (patchFileInfoInner.exists) {
-            await FS.deleteAsync(patchFile);
+          if (patchFileExists) {
+            await FS.unlink(patchFile);
           }
           console.log('write done');
           await diff(oldFile, newFile, patchFile);
           console.log('diff done', patchFile, oldFile, newFile);
-          patchFileInfoInner = await FS.getInfoAsync(patchFile);
-          console.log('start patch', patchFileInfoInner);
-          setPatchFileUri(patchFileInfoInner.uri);
-          const newFile1Info = await FS.getInfoAsync(newFile1);
-          if (newFile1Info.exists) {
-            await FS.deleteAsync(newFile1);
+          patchFileExists = await FS.exists(patchFile);
+          console.log('start patch', patchFileExists);
+          const patchFileInfoInner = await FS.stat(patchFile);
+          setPatchFileUri(patchFileInfoInner.path);
+          const newFile1InfoExists = await FS.exists(newFile1);
+          if (newFile1InfoExists) {
+            await FS.unlink(newFile1);
           }
           await patch(oldFile, newFile1, patchFile);
           console.log('patch done');
-          const t = await FS.readAsStringAsync(newFile1, {
-            encoding: FS.EncodingType.UTF8,
-          });
+          const t = await FS.readFile(newFile1);
           setTextLength(t.length);
         } catch (error) {
           console.log(error);
@@ -60,8 +53,16 @@ export default function App() {
         console.log(e);
       });
     return () => {
-      FS.deleteAsync(FS.documentDirectory + 'test.txt');
-      FS.deleteAsync(FS.documentDirectory + 'test1.txt');
+      FS.exists(oldFile).then((exists) => {
+        if (exists) {
+          FS.unlink(oldFile);
+        }
+      });
+      FS.exists(newFile).then((exists) => {
+        if (exists) {
+          FS.unlink(newFile);
+        }
+      });
     };
   }, [newFile, newFile1, oldFile, patchFile]);
 
