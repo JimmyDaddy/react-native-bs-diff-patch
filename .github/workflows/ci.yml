@@ -1,151 +1,321 @@
 name: CI
 on:
-  push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+
+  install-dep:
+    runs-on: macos-latest
+    name: Install dependencies
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout the code
+      uses: actions/checkout@v4
 
-      - name: Setup
-        uses: ./.github/actions/setup
+    - name: Verify Dev Changed files
+      uses: tj-actions/changed-files@v41
+      id: verify-dev-changed-files
+      with:
+        files: |
+          !*.md
+          !*.MD
+          !*.yml
 
-      - name: Lint files
-        run: yarn lint
+    - uses: actions/cache@v3
+      name: Cache node_modules
+      id: cache-node-modules
+      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+      with:
+        path: |
+          node_modules
+          example/node_modules
+        key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
 
-      - name: Typecheck files
-        run: yarn typecheck
+    - name: Set up Ruby
+      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 2.7
+        bundler-cache: true
 
-  test:
-    runs-on: ubuntu-latest
+    - name: Setup node
+      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+
+    - name: Install yarn
+      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+      run: npm install -g yarn@1.22.10
+
+    - name: Install dependencies
+      if: steps.cache-node-modules.outputs.cache-hit != 'true' && steps.verify-dev-changed-files.outputs.any_changed == 'true'
+      run: |
+        yarn
+
+  android-build:
+    runs-on: macos-latest
+    name: Android Build
+    needs: install-dep
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout the code
+      uses: actions/checkout@v4
 
-      - name: Setup
-        uses: ./.github/actions/setup
+    - name: Verify Android Changed files
+      uses: tj-actions/changed-files@v41
+      id: verify-android-changed-files
+      with:
+        files: |
+          android/**
+          src/**
+          assets/**
+          package.json
+          !example/ios/**
+          example/e2e/**
 
-      - name: Run unit tests
-        run: yarn test --maxWorkers=2 --coverage
+    - uses: actions/cache@v3
+      name: Cache node_modules
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      id: cache-node-modules
+      with:
+        path: |
+          node_modules
+          example/node_modules
+        fail-on-cache-miss: true
+        key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
 
-  build-library:
-    runs-on: ubuntu-latest
+    - uses: actions/cache@v3
+      id: cache-gradle
+      name: Cache Gradle dependencies
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/src/**/*.kt') }}
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      with:
+        ruby-version: 2.7
+        bundler-cache: true
+
+    - name: Setup node
+      uses: actions/setup-node@v3
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      with:
+        node-version: '18'
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      with:
+        distribution: 'zulu'
+        java-version: 17
+
+    - name: Install Gradle dependencies
+      if: steps.cache-gradle.outputs.cache-hit != 'true' && steps.verify-android-changed-files.outputs.any_changed == 'true'
+      run: |
+        cd example/android
+        ./gradlew build --stacktrace
+
+    - name: Run unit tests
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      run: |
+        cd example/android
+        ./gradlew test --stacktrace
+
+    - name: Build APK
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      run: |
+        npm run prepack
+        cd example/android
+        ./gradlew assembleRelease
+        mv app/build/outputs/apk/release/app-release.apk app-release-${{ github.sha }}.apk
+
+    - name: Upload APK
+      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-release-${{ github.sha }}.apk
+        path:  ${{ github.workspace }}/example/android/app-release-${{ github.sha }}.apk
+
+  android-api-level-test:
+    runs-on: macos-latest
+    needs: android-build
+    name: Android Test
+    strategy:
+      matrix:
+        api-level: [24, 25, 29, 30, 31]
+        target: [default]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout the code
+        uses: actions/checkout@v4
 
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Build package
-        run: yarn prepare
-
-  build-android:
-    runs-on: ubuntu-latest
-    env:
-      TURBO_CACHE_DIR: .turbo/android
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Cache turborepo for Android
-        uses: actions/cache@v3
+      - name: Verify Android Changed files
+        uses: tj-actions/changed-files@v41
+        id: verify-android-changed-files
         with:
-          path: ${{ env.TURBO_CACHE_DIR }}
-          key: ${{ runner.os }}-turborepo-android-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-turborepo-android-
+          files: |
+            android/**
+            src/**
+            assets/**
+            package.json
+            !example/ios/**
+            example/e2e/**
 
-      - name: Check turborepo cache for Android
-        run: |
-          TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:android').cache.status")
+      - uses: actions/cache@v3
+        name: Cache node_modules
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        id: cache-node-modules
+        with:
+          path: |
+            node_modules
+            example/node_modules
+          fail-on-cache-miss: true
+          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
 
-          if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
-            echo "turbo_cache_hit=1" >> $GITHUB_ENV
-          fi
+      - uses: actions/cache@v3
+        name: Cache Gradle dependencies
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        id: cache-gradle
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          fail-on-cache-miss: true
+          key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/src/**/*.kt') }}
 
-      - name: Install JDK
-        if: env.turbo_cache_hit != 1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          ruby-version: 2.7
+          bundler-cache: true
+
+      - name: Setup node
+        uses: actions/setup-node@v3
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          node-version: '18'
+
+      - name: Set up JDK
         uses: actions/setup-java@v3
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         with:
           distribution: 'zulu'
-          java-version: '11'
+          java-version: 17
 
-      - name: Finalize Android SDK
-        if: env.turbo_cache_hit != 1
-        run: |
-          /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
-
-      - name: Cache Gradle
-        if: env.turbo_cache_hit != 1
-        uses: actions/cache@v3
+      - name: Instrumentation Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: Nexus 6
+          script: |
+            cd example/android && ./gradlew connectedCheck  --stacktrace
 
-      - name: Build example for Android
-        run: |
-          yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+      - name: Upload Reports
+        uses: actions/upload-artifact@v3
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          name: Test-Reports
+          path:  ${{ github.workspace }}/example/android/app/build/reports
 
-  build-ios:
+  ios-build-test:
     runs-on: macos-latest
-    env:
-      TURBO_CACHE_DIR: .turbo/ios
+    needs: install-dep
+    name: iOS Build and Test
+    strategy:
+      matrix:
+        cocoapods: ['1.10.1', '1.11.0', '1.14.3']
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout the code
+      uses: actions/checkout@v4
 
-      - name: Setup
-        uses: ./.github/actions/setup
+    - name: Verify iOS Changed files
+      uses: tj-actions/changed-files@v41
+      id: verify-iOS-changed-files
+      with:
+        files: |
+          ios/**
+          src/**
+          assets/**
+          package.json
+          !example/android/**
+          example/e2e/**
 
-      - name: Cache turborepo for iOS
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.TURBO_CACHE_DIR }}
-          key: ${{ runner.os }}-turborepo-ios-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-turborepo-ios-
+    - uses: actions/cache@v3
+      name: Cache node_modules
+      id: cache-node-modules
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      with:
+        path: |
+          node_modules
+          example/node_modules
+        key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
+        fail-on-cache-miss: true
 
-      - name: Check turborepo cache for iOS
-        run: |
-          TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:ios').cache.status")
+    - name: Cache Pods
+      id: cache-pods
+      uses: actions/cache@v3
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      with:
+        path: example/ios/Pods
+        key: ${{ runner.os }}-pods-${{ matrix.cocoapods }}-${{ hashFiles('**/Podfile.lock') }}
 
-          if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
-            echo "turbo_cache_hit=1" >> $GITHUB_ENV
-          fi
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      with:
+        ruby-version: 2.7
+        bundler-cache: true
 
-      - name: Cache cocoapods
-        if: env.turbo_cache_hit != 1
-        id: cocoapods-cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            **/ios/Pods
-          key: ${{ runner.os }}-cocoapods-${{ hashFiles('example/ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cocoapods-
+    - name: Install Cocoapods
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      run: gem install cocoapods -v ${{ matrix.cocoapods }}
 
-      - name: Install cocoapods
-        if: env.turbo_cache_hit != 1 && steps.cocoapods-cache.outputs.cache-hit != 'true'
-        run: |
-          yarn pod-install example/ios
-        env:
-          NO_FLIPPER: 1
+    - name: Setup node
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
 
-      - name: Build example for iOS
-        run: |
-          yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+    - name: Install Pods
+      if: steps.cache-pods.outputs.cache-hit != 'true' && steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      run: |
+        cd example/ios
+        pod cache clean --all
+        pod install
+
+    - name: Install xcpretty
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      run: gem install xcpretty
+
+    - name: Build
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      run: |
+        cd example/ios
+        xcodebuild -workspace ImageMarkerExample.xcworkspace -scheme ImageMarkerExample -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 12' | xcpretty
+
+    - name: Test
+      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      run: |
+        cd example/ios
+        xcodebuild -workspace ImageMarkerExample.xcworkspace -scheme ImageMarkerExample -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 12' test | xcpretty
+
+  ci-complete:
+    name: Complete CI
+    needs: [android-build, android-api-level-test, ios-build-test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all job status
+        if: >-
+          ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: exit 1

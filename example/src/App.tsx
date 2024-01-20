@@ -5,23 +5,23 @@ import { diff, patch } from 'react-native-bs-diff-patch';
 import * as FS from 'react-native-fs';
 
 export default function App() {
-  const newFile = FS.DocumentDirectoryPath + 'test1.txt';
-  const oldFile = FS.DocumentDirectoryPath + 'test.txt';
-  const patchFile = FS.DocumentDirectoryPath + 'patch.txt';
-  const newFile1 = FS.DocumentDirectoryPath + 'test2.txt';
+  const newFile = FS.DocumentDirectoryPath + '/test1.txt';
+  const oldFile = FS.DocumentDirectoryPath + '/test.txt';
+  const patchFile = FS.DocumentDirectoryPath + '/patch.txt';
+  const newFile1 = FS.DocumentDirectoryPath + '/test2.txt';
 
   const [textLength, setTextLength] = React.useState<number | undefined>();
   const [patchFileUri, setPatchFileUri] = React.useState<string | undefined>();
 
   React.useEffect(() => {
     FS.writeFile(
-      FS.DocumentDirectoryPath + 'test.txt',
+      FS.DocumentDirectoryPath + '/test.txt',
       new Array(10000).fill('Hello World').join(' | ')
     )
       .then(async () => {
         try {
           await FS.writeFile(
-            FS.DocumentDirectoryPath + 'test1.txt',
+            FS.DocumentDirectoryPath + '/test1.txt',
             new Array(10000).fill('Hello World 1').join(' | ')
           );
 
