@@ -45,7 +45,8 @@ target 'BsDiffPatchExample' do
     # you should disable the next line.
     :flipper_configuration => flipper_config,
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    :hermes_enabled => false
   )
 
   target 'BsDiffPatchExampleTests' do
