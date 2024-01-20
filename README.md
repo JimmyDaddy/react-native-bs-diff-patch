@@ -1,6 +1,6 @@
 # react-native-bs-diff-patch
 
-rn bs diff patch 
+rn bs diff patch file
 
 ## Installation
 
@@ -11,11 +11,17 @@ npm install react-native-bs-diff-patch
 ## Usage
 
 ```js
-import { multiply } from 'react-native-bs-diff-patch';
+import { diff, patch } from 'react-native-bs-diff-patch';
 
 // ...
 
-const result = await multiply(3, 7);
+/**
+ * generate patch file from old file and new file
+ */
+await diff(oldFile, newFile, patchFile);
+// generate new file from old file and patch file
+await patch(oldFile, newFile, patchFile);
+
 ```
 
 ## Contributing
