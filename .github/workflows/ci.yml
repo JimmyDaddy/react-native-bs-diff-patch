@@ -196,7 +196,7 @@ jobs:
           ruby-version: 2.7
           bundler-cache: true
 
-      - name: Setup node 16
+      - name: Setup node
         uses: actions/setup-node@v3
         if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         with:
@@ -280,7 +280,7 @@ jobs:
       if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
       run: gem install cocoapods -v ${{ matrix.cocoapods }}
 
-    - name: Setup node 16
+    - name: Setup node
       if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
       uses: actions/setup-node@v3
       with:
