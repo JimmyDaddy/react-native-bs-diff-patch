@@ -20,6 +20,12 @@ apply plugin: "kotlin-android"
 
 if (isNewArchitectureEnabled()) {
   apply plugin: "com.facebook.react"
+
+  react {
+    jsRootDir = file("../src")
+    libraryName = "RNBsDiffPatchSpec"
+    codegenJavaPackageName = "com.jimmydaddy.bsdiffpatch"
+  }
 }
 
 def getExtOrDefault(name) {
@@ -42,11 +48,18 @@ def supportsNamespace() {
 android {
   if (supportsNamespace()) {
     namespace "com.jimmydaddy.bsdiffpatch"
+  }
 
-    sourceSets {
-      main {
+  sourceSets {
+    main {
+      if (supportsNamespace()) {
         manifest.srcFile "src/main/AndroidManifestNew.xml"
       }
+      java.setSrcDirs(
+        isNewArchitectureEnabled()
+          ? ["src/main/java", "newarch/java"]
+          : ["src/main/java", "oldarch/java"]
+      )
     }
   }
 
@@ -100,4 +113,3 @@ dependencies {
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }
-

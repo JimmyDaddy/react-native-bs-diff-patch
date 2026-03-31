@@ -1,5 +1,10 @@
 #import "BsDiffPatch.h"
 
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <memory>
+#import <ReactCommon/RCTTurboModule.h>
+#endif
+
 @implementation BsDiffPatch
 RCT_EXPORT_MODULE()
 
@@ -88,5 +93,13 @@ RCT_EXPORT_METHOD(diff:(NSString*) oldFile
     NSNumber *result = @(bsdiffpatch::diffFile(oldFileCString, newFileCString, patchFileCString));
     resolve(result);
 }
+
+#ifdef RCT_NEW_ARCH_ENABLED
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+    return std::make_shared<facebook::react::NativeBsDiffPatchSpecJSI>(params);
+}
+#endif
 
 @end

@@ -2,6 +2,8 @@
 
 rn bs diff patch file
 
+Supports both the legacy bridge and React Native New Architecture (TurboModule).
+
 ## Installation
 
 ```sh
