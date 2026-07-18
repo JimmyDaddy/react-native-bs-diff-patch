@@ -7,14 +7,16 @@ if (navToggle && navLinks) {
   navToggle.addEventListener('click', () => {
     const expanded = navToggle.getAttribute('aria-expanded') === 'true';
     navToggle.setAttribute('aria-expanded', String(!expanded));
-    navToggle.textContent = expanded ? 'Menu' : 'Close';
+    navToggle.textContent = expanded
+      ? navToggle.dataset.closedLabel || 'Menu'
+      : navToggle.dataset.openLabel || 'Close';
     navLinks.classList.toggle('is-open', !expanded);
   });
 
   navLinks.addEventListener('click', (event) => {
     if (event.target instanceof HTMLAnchorElement) {
       navToggle.setAttribute('aria-expanded', 'false');
-      navToggle.textContent = 'Menu';
+      navToggle.textContent = navToggle.dataset.closedLabel || 'Menu';
       navLinks.classList.remove('is-open');
     }
   });

@@ -38,6 +38,10 @@ The Web adapter validates the header and signature before entering the C patch
 function. Native and Web operations use the same checked-in bsdiff and bzip2
 sources, preserving cross-platform patch compatibility.
 
+The format identifies the patch implementation, but not the intended baseline
+or release. Applications should carry baseline and target digests in a trusted
+manifest when distributing patches.
+
 ## WebAssembly packaging
 
 `scripts/build-web-wasm.sh` invokes Emscripten with:
@@ -61,6 +65,20 @@ output size.
 For very large updates, enforce an application limit before calling the
 library, and consider a server-side or streaming update strategy when the full
 files cannot safely fit in memory.
+
+## Ownership boundaries
+
+The library owns patch computation and platform scheduling. The application
+owns:
+
+- file selection, storage permissions, and temporary-file cleanup;
+- patch transport and cache policy;
+- authentication and cryptographic integrity checks;
+- concurrency, size, and time limits;
+- verification and atomic replacement of the restored output.
+
+Keeping these responsibilities outside the patch engine lets applications use
+their existing filesystem and release trust model.
 
 ## Compatibility rule
 

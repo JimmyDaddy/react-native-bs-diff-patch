@@ -112,8 +112,21 @@ try {
     await page.$eval('h1', (element) => element.textContent),
     'API reference'
   );
+
+  await page.goto(`${baseUrl}/docs/zh-CN/getting-started/`, {
+    waitUntil: 'networkidle0',
+  });
+  assert.equal(
+    await page.$eval('h1', (element) => element.textContent),
+    '快速开始'
+  );
+  assert.equal(await page.$eval('html', (element) => element.lang), 'zh-CN');
+  assert.equal(
+    await page.$eval('a[hreflang="en"]', (element) => element.textContent),
+    'English'
+  );
   assert.equal(pageErrors.length, 0, pageErrors.join('\n'));
-  console.log('Site Playground, docs, and mobile viewport passed');
+  console.log('Site Playground, bilingual docs, and mobile viewport passed');
 } finally {
   await browser.close();
   await new Promise((resolve, reject) =>

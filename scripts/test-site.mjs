@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryDirectory = path.resolve(scriptDirectory, '..');
 const outputDirectory = path.join(repositoryDirectory, 'site-dist');
+const documentationDirectory = path.join(repositoryDirectory, 'docs');
 
 const requiredFiles = [
   'index.html',
@@ -22,10 +23,19 @@ const requiredFiles = [
   'docs/index.html',
   'docs/getting-started/index.html',
   'docs/api-reference/index.html',
+  'docs/recipes/index.html',
   'docs/platform-support/index.html',
   'docs/architecture/index.html',
   'docs/troubleshooting/index.html',
   'docs/development/index.html',
+  'docs/zh-CN/index.html',
+  'docs/zh-CN/getting-started/index.html',
+  'docs/zh-CN/api-reference/index.html',
+  'docs/zh-CN/recipes/index.html',
+  'docs/zh-CN/platform-support/index.html',
+  'docs/zh-CN/architecture/index.html',
+  'docs/zh-CN/troubleshooting/index.html',
+  'docs/zh-CN/development/index.html',
 ];
 
 for (const relativePath of requiredFiles) {
@@ -48,6 +58,21 @@ async function htmlFiles(directory) {
       return entry.isDirectory()
         ? htmlFiles(entryPath)
         : entry.name.endsWith('.html')
+        ? [entryPath]
+        : [];
+    })
+  );
+  return nested.flat();
+}
+
+async function markdownFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map((entry) => {
+      const entryPath = path.join(directory, entry.name);
+      return entry.isDirectory()
+        ? markdownFiles(entryPath)
+        : entry.name.endsWith('.md')
         ? [entryPath]
         : [];
     })
@@ -93,6 +118,34 @@ for (const htmlPath of await htmlFiles(outputDirectory)) {
         `broken local reference ${reference} in ${htmlPath}`
       );
     }
+  }
+}
+
+const markdownSources = [
+  path.join(repositoryDirectory, 'README.md'),
+  path.join(repositoryDirectory, 'README.zh-CN.md'),
+  path.join(repositoryDirectory, 'CONTRIBUTING.md'),
+  ...(await markdownFiles(documentationDirectory)),
+];
+
+for (const markdownPath of markdownSources) {
+  const markdown = await readFile(markdownPath, 'utf8');
+  const references = [...markdown.matchAll(/\]\(([^)]+)\)/g)].map(
+    (match) => match[1].split('#')[0]
+  );
+  for (const reference of references) {
+    if (!reference || /^(https?:|mailto:|tel:|\/)/.test(reference)) {
+      continue;
+    }
+    const target = path.resolve(path.dirname(markdownPath), reference);
+    assert.ok(
+      target.startsWith(`${repositoryDirectory}${path.sep}`),
+      `Markdown reference escapes repository: ${reference} in ${markdownPath}`
+    );
+    await assert.doesNotReject(
+      stat(target),
+      `broken Markdown reference ${reference} in ${markdownPath}`
+    );
   }
 }
 

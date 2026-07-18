@@ -11,8 +11,9 @@
 | Background execution           | Serial executor    | Serial dispatch queue | Module Web Worker  |
 | Patch format                   | `ENDSLEY/BSDIFF43` | `ENDSLEY/BSDIFF43`    | `ENDSLEY/BSDIFF43` |
 
-The project is continuously exercised with React Native 0.73 and has
-compatibility build coverage against newer New Architecture package APIs.
+The example application continuously exercises React Native 0.73. CI also
+builds consumer fixtures against newer New Architecture package APIs, including
+the Android package API split described below.
 
 ## Android
 
@@ -53,8 +54,18 @@ Webpack and Vite understand the standard
 `new Worker(new URL(..., import.meta.url), { type: 'module' })` pattern. A Metro
 Web setup must preserve module-worker URLs in its Web serializer.
 
+The Web entry is browser-oriented rather than a Node.js filesystem adapter. It
+does not make the native file-path APIs available in Node.js.
+
 ## Server-side rendering
 
 Importing the Web entry does not create a worker. Calling `diffBytes` or
 `patchBytes` in an environment without `Worker` rejects with `EUNSUPPORTED`.
 Invoke the binary APIs only in browser/client code.
+
+## Patch exchange
+
+Patch bytes are portable across Android, iOS, and Web. File access, transport,
+storage, integrity verification, and final replacement remain application
+responsibilities. See [Production recipes](./recipes.md) for a safe exchange
+sequence.

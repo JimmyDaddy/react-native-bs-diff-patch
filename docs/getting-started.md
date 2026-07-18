@@ -1,6 +1,7 @@
 # Getting started
 
-This guide creates a patch, applies it, and verifies the restored output.
+This guide installs the package, selects the correct API family, and completes
+a patch round trip.
 
 ## Install
 
@@ -8,51 +9,76 @@ This guide creates a patch, applies it, and verifies the restored output.
 npm install react-native-bs-diff-patch
 ```
 
-Install iOS pods after changing native dependencies:
+Install iOS pods after adding or updating the native dependency:
 
 ```sh
 npx pod-install
 ```
 
-No manual Android package registration is required when React Native
-autolinking is enabled.
+React Native autolinking handles Android and iOS registration. Rebuild the
+native application after installation; reloading Metro does not change the
+native modules inside an already-installed binary.
+
+## Choose the API for the runtime
+
+| Runtime      | Use                          | Do not use       |
+| ------------ | ---------------------------- | ---------------- |
+| Android, iOS | `diff` and `patch`           | Binary-data APIs |
+| Web          | `diffBytes` and `patchBytes` | File-path APIs   |
+
+The unavailable family rejects with `EUNSUPPORTED`, which helps catch imports
+that resolved to an unexpected platform entry.
 
 ## Native file workflow
 
-Native APIs operate on absolute file paths. A filesystem library or your own
-native code is responsible for creating and reading those files.
+Native APIs operate on absolute file paths. The library does not choose a
+storage directory or manage file lifetime; use the filesystem solution already
+present in your application.
 
 ```ts
 import { diff, patch } from 'react-native-bs-diff-patch';
 
-const patchPath = `${cacheDirectory}/release-2.patch`;
-const restoredPath = `${cacheDirectory}/release-2.restored`;
+type NativeRoundTripOptions = {
+  oldFilePath: string;
+  newFilePath: string;
+  cacheDirectory: string;
+};
 
-const diffResult = await diff(oldPath, newPath, patchPath);
-const patchResult = await patch(oldPath, restoredPath, patchPath);
+export async function nativeRoundTrip({
+  oldFilePath,
+  newFilePath,
+  cacheDirectory,
+}: NativeRoundTripOptions) {
+  const runId = Date.now();
+  const patchPath = `${cacheDirectory}/release-${runId}.patch`;
+  const restoredPath = `${cacheDirectory}/release-${runId}.restored`;
 
-if (diffResult !== 0 || patchResult !== 0) {
-  throw new Error('Binary patch operation failed');
+  await diff(oldFilePath, newFilePath, patchPath);
+  await patch(oldFilePath, restoredPath, patchPath);
+
+  return { patchPath, restoredPath };
 }
 ```
 
 Before calling `diff`:
 
-- `oldPath` and `newPath` must exist.
+- `oldFilePath` and `newFilePath` must exist.
 - `patchPath` must not exist.
-- All three paths must be different.
+- All three paths must be non-empty and different.
 
 Before calling `patch`:
 
-- `oldPath` and `patchPath` must exist.
+- `oldFilePath` and `patchPath` must exist.
 - `restoredPath` must not exist.
-- All three paths must be different.
+- All three paths must be non-empty and different.
 
-Remove stale outputs or choose unique names before retrying an operation.
+Use a content hash or byte comparison from your filesystem layer to verify that
+`restoredPath` matches `newFilePath`. Clean the patch and restored file when
+they are no longer needed.
 
 ## Web binary workflow
 
-React Native Web uses binary data instead of filesystem paths:
+React Native Web uses binary values instead of filesystem paths:
 
 ```ts
 import { diffBytes, patchBytes } from 'react-native-bs-diff-patch';
@@ -67,29 +93,39 @@ const restoredData = await patchBytes(oldData, patchData);
 const matches =
   restoredData.length === newData.length &&
   restoredData.every((byte, index) => byte === newData[index]);
+
+if (!matches) {
+  throw new Error('Patch round trip did not reproduce the target data');
+}
 ```
 
-Inputs are copied before being transferred to the worker, so the caller's
-buffers remain usable. The result is a new `Uint8Array`.
+Inputs are copied before being transferred to the module Worker, so the
+caller's buffers remain usable. Each result is a new `Uint8Array`.
 
-## Use files in a browser
+## Use browser files
 
 ```ts
-const oldData = await oldFile.arrayBuffer();
-const newData = await newFile.arrayBuffer();
-const patchData = await diffBytes(oldData, newData);
+import { diffBytes } from 'react-native-bs-diff-patch';
 
-const download = document.createElement('a');
-download.href = URL.createObjectURL(
-  new Blob([patchData], { type: 'application/octet-stream' })
-);
-download.download = 'update.patch';
-download.click();
+export async function downloadPatch(oldFile: File, newFile: File) {
+  const patchData = await diffBytes(oldFile, newFile);
+  const url = URL.createObjectURL(
+    new Blob([patchData], { type: 'application/octet-stream' })
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'update.patch';
+  link.click();
+  URL.revokeObjectURL(url);
+}
 ```
+
+The Web API is client-only. Importing it during server-side rendering is safe,
+but call it only after a browser `Worker` is available.
 
 ## Next steps
 
-- Read the [API reference](./api-reference.md).
+- Copy a recovery pattern from [Production recipes](./recipes.md).
+- Review all signatures and error codes in the [API reference](./api-reference.md).
 - Check [platform and bundler support](./platform-support.md).
-- Understand the [execution architecture](./architecture.md).
 - Try the [live Playground](https://bs-dff-patch.corerobin.com/#playground).

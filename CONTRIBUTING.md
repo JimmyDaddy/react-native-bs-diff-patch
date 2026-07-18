@@ -82,6 +82,10 @@ yarn site:test
 yarn site:test:browser
 ```
 
+Public English guides live in `docs/`, with their Chinese mirrors in
+`docs/zh-CN/`. Keep both languages aligned when a change affects API behavior,
+platform support, errors, or operational guidance.
+
 ### Commit message convention
 
 We follow the [conventional commits specification](https://www.conventionalcommits.org/en) for our commit messages:

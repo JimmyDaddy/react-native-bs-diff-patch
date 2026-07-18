@@ -1,6 +1,17 @@
 # API reference
 
-The package exposes two platform-specific API families under one import path.
+The package exposes two platform-specific API families from the same import
+path. Native runtimes use absolute paths; Web uses in-memory binary values.
+
+```ts
+import {
+  diff,
+  patch,
+  diffBytes,
+  patchBytes,
+  type BinaryInput,
+} from 'react-native-bs-diff-patch';
+```
 
 ## `diff`
 
@@ -18,23 +29,27 @@ Creates a binary patch at `patchFile`. Available on Android and iOS.
 - `newFile`: existing target file path.
 - `patchFile`: destination path that must not already exist.
 - Resolves to `0` on success.
+- Rejects rather than overwriting an existing `patchFile`.
 
 ## `patch`
 
 ```ts
 function patch(
   oldFile: string,
-  newFile: string,
+  outputFile: string,
   patchFile: string
 ): Promise<number>;
 ```
 
-Reconstructs the target file at `newFile`. Available on Android and iOS.
+Reconstructs the target file at `outputFile`. Available on Android and iOS.
 
 - `oldFile`: existing baseline file path.
-- `newFile`: destination path that must not already exist.
+- `outputFile`: destination path that must not already exist. The runtime
+  implementation names this argument `newFile`; its position and behavior are
+  the public contract.
 - `patchFile`: existing compatible patch path.
 - Resolves to `0` on success.
+- Rejects rather than overwriting an existing `outputFile`.
 
 ## `diffBytes`
 
@@ -49,6 +64,10 @@ function diffBytes(
 
 Creates a binary patch in a Web Worker. Available on Web.
 
+- Accepts `ArrayBuffer`, any typed-array or `DataView`, and `Blob`.
+- Copies inputs, so buffers owned by the caller are not detached.
+- Resolves to a new `Uint8Array` containing an `ENDSLEY/BSDIFF43` patch.
+
 ## `patchBytes`
 
 ```ts
@@ -61,10 +80,28 @@ function patchBytes(
 Applies a compatible patch in a Web Worker and resolves to the reconstructed
 bytes. Available on Web.
 
+- Validates the patch header before invoking the WebAssembly core.
+- Copies inputs and resolves to a new `Uint8Array`.
+- Does not mutate `oldData` or `patchData`.
+
+## Availability behavior
+
+All four functions remain exported so shared code has one stable import shape.
+Calling `diffBytes` or `patchBytes` on native rejects with `EUNSUPPORTED`.
+Calling `diff` or `patch` on Web behaves the same way.
+
+Importing the Web entry during server-side rendering does not start a Worker.
+Calling a binary API without browser Worker support rejects with
+`EUNSUPPORTED`.
+
 ## Error shape
 
 Rejected operations expose a normal `Error` with a string `code` when the
 platform can classify the failure.
+
+```ts
+type PatchError = Error & { code?: string };
+```
 
 | Code           | Meaning                                                     |
 | -------------- | ----------------------------------------------------------- |
@@ -79,11 +116,16 @@ platform can classify the failure.
 Treat error messages as diagnostic text rather than a stable machine-readable
 contract. Branch on `code` when recovery behavior differs.
 
+Native validation stops before entering the C core. Web failures related to
+Worker startup, patch validation, or WebAssembly execution use
+`EWEBASSEMBLY` unless a more specific code is available.
+
 ## Concurrency and ordering
 
 Each native platform uses a serial library-owned queue. Every Web call creates
 an isolated module Worker and terminates it after completion. Do not rely on
-operations completing in submission order across separate Web calls.
+operations completing in submission order across separate Web calls, and apply
+an application-level concurrency limit for large browser inputs.
 
 ## Patch format
 

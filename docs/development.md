@@ -48,6 +48,8 @@ yarn site:test:browser
 
 The static output is written to `site-dist/` and deployed by the GitHub Pages
 workflow. Markdown under `docs/` is rendered into the site by the build script.
+English pages live directly under `docs/`; Chinese mirrors live under
+`docs/zh-CN/`. Keep both versions aligned when behavior or public API changes.
 
 ## Rebuild WebAssembly
 
@@ -74,5 +76,6 @@ For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 1. Run the core, Web, and site gates.
 2. Inspect `npm pack --dry-run --ignore-scripts` and confirm `web/` is present.
 3. Confirm public docs match the exported TypeScript declarations.
-4. Use the repository release command to create the version and tag.
-5. Verify the npm package and GitHub release before announcing availability.
+4. Confirm English and Chinese public guides describe the same behavior.
+5. Use the repository release command to create the version and tag.
+6. Verify the npm package and GitHub release before announcing availability.

@@ -1,5 +1,15 @@
 # Troubleshooting
 
+Start with the error `code`, then confirm the runtime and input model:
+
+| Symptom                          | First check                                      |
+| -------------------------------- | ------------------------------------------------ |
+| Native module cannot be found    | Rebuild the installed native application         |
+| `ENOENT`, `EEXIST`, `EINVAL`     | Inspect path state before starting native work   |
+| `EUNSUPPORTED`                   | Confirm that the correct API family was selected |
+| Worker or `EWEBASSEMBLY` failure | Check emitted Web assets, CSP, and patch magic   |
+| High memory use                  | Enforce input and concurrency limits             |
+
 ## `TurboModuleRegistry.getEnforcing(...): 'BsDiffPatch' could not be found`
 
 Rebuild the native application after installing the package. Metro reloads do
@@ -41,6 +51,10 @@ Confirm the bundler emits module-worker assets and that the deployed server
 serves `.mjs` files as JavaScript. Strict Content Security Policy deployments
 must permit same-origin workers and WebAssembly execution.
 
+Open the browser network panel and confirm `worker.mjs`, `operations.mjs`, and
+`bsdiffpatch.mjs` are returned with successful status codes rather than the
+application HTML fallback.
+
 ## `EWEBASSEMBLY` or corrupt patch
 
 Check the first 16 bytes of the patch. Supported patches begin with
@@ -52,6 +66,16 @@ data will be rejected.
 The algorithm and adapters operate on complete in-memory buffers. Add a size
 check before calling the library and avoid accepting arbitrary large untrusted
 files. Web execution is off-main-thread but still consumes the tab's memory.
+
+Multiple Web operations create separate Workers. Debounce repeated user actions
+and add an application-level queue if large calls can overlap.
+
+## Restored output does not match
+
+Confirm that the patch was generated from the exact baseline bytes being used
+for restoration. Preserve patches as opaque binary data and avoid string or
+JSON conversion. Verify the patch digest before applying it and the target
+digest before replacing application data.
 
 ## Getting more diagnostics
 
