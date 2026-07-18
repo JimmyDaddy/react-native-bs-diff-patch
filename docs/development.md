@@ -66,8 +66,8 @@ Commit the regenerated `web/bsdiffpatch.mjs` with the C source change.
 ## Native verification
 
 Android CI builds both architecture modes and runs the New Architecture device
-round trip on its emulator matrix. iOS CI builds and tests legacy and New
-Architecture configurations across the supported CocoaPods matrix.
+round trip on its emulator matrix. iOS CI uses the CocoaPods version locked in
+the example Gemfile to build and test both legacy and New Architecture modes.
 
 For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 

@@ -64,7 +64,7 @@ yarn test:web:browser
 ## 原生验证
 
 Android CI 构建两种架构模式，并在模拟器矩阵执行新架构设备级往返测试。iOS CI
-在受支持的 CocoaPods 矩阵中构建并测试旧架构和新架构配置。
+使用示例 Gemfile 锁定的 CocoaPods 版本构建并测试旧架构和新架构配置。
 
 本地示例命令见仓库
 [CONTRIBUTING.md](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/CONTRIBUTING.md)。
