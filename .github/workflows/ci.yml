@@ -67,7 +67,7 @@ jobs:
                   quality=true
                   web=true
                   ;;
-                android/**|example/android/**)
+                android/**|example/android/**|scripts/run-android-runtime-test.sh)
                   android=true
                   quality=true
                   ;;
@@ -225,35 +225,7 @@ jobs:
           target: default
           arch: x86_64
           profile: Nexus 6
-          script: |
-            cd example/android
-            run_runtime_test() {
-              ./gradlew :app:connectedReleaseAndroidTest --stacktrace -PnewArchEnabled=true -PreactNativeArchitectures=x86_64
-            }
-
-            if run_runtime_test; then
-              exit 0
-            fi
-
-            if [ "${{ matrix.api-level }}" -ne 24 ]; then
-              exit 1
-            fi
-
-            echo '::warning::API 24 emulator failed; rebooting it before one retry.'
-            adb reboot
-            adb wait-for-device
-
-            boot_attempt=0
-            until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ]; do
-              boot_attempt=$((boot_attempt + 1))
-              if [ "$boot_attempt" -ge 90 ]; then
-                echo 'API 24 emulator did not finish rebooting within 180 seconds.' >&2
-                exit 1
-              fi
-              sleep 2
-            done
-
-            run_runtime_test
+          script: sh scripts/run-android-runtime-test.sh ${{ matrix.api-level }}
 
       - name: Upload instrumentation reports
         if: always()
