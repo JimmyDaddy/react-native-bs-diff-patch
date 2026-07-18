@@ -1,9 +1,10 @@
 {
   "name": "react-native-bs-diff-patch",
   "version": "0.0.2",
-  "description": "rn bs diff patch ",
+  "description": "Binary diff and patch support for React Native and React Native Web",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
+  "browser": "web/index.mjs",
   "types": "lib/typescript/src/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
@@ -13,6 +14,8 @@
     "android",
     "ios",
     "cpp",
+    "web",
+    "scripts/build-web-wasm.sh",
     "*.podspec",
     "!ios/build",
     "!android/build",
@@ -20,6 +23,9 @@
     "!android/gradlew",
     "!android/gradlew.bat",
     "!android/local.properties",
+    "!lib/commonjs/index.web.js*",
+    "!lib/module/index.web.js*",
+    "!lib/typescript/src/index.web.d.ts*",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
@@ -28,14 +34,24 @@
   "scripts": {
     "example": "yarn workspace react-native-bs-diff-patch-example",
     "test": "jest",
+    "test:web": "node scripts/test-web.mjs",
+    "test:web:browser": "node scripts/test-web-browser.mjs",
+    "test:web:metro": "node scripts/test-web-metro.mjs",
+    "site:build": "node scripts/build-site.mjs",
+    "site:test": "node scripts/test-site.mjs",
+    "site:test:browser": "node scripts/test-site-browser.mjs",
+    "site:preview": "python3 -m http.server 4173 --bind 127.0.0.1 --directory site-dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bob build",
+    "build:web": "bash scripts/build-web-wasm.sh",
     "release": "release-it"
   },
   "keywords": [
     "react-native",
+    "react-native-web",
+    "webassembly",
     "ios",
     "android"
   ],
@@ -68,6 +84,7 @@
     "jest": "^28.1.1",
     "pod-install": "^0.1.0",
     "prettier": "^2.0.5",
+    "puppeteer-core": "^22.15.0",
     "react": "18.2.0",
     "react-native": "0.73.2",
     "react-native-builder-bob": "^0.20.0",
@@ -107,7 +124,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "github": {
       "release": true
@@ -138,6 +155,7 @@
     }
   },
   "eslintIgnore": [
+    "build/",
     "node_modules/",
     "lib/"
   ],
@@ -161,5 +179,18 @@
         }
       ]
     ]
+  },
+  "codegenConfig": {
+    "name": "RNBsDiffPatchSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.jimmydaddy.bsdiffpatch"
+    },
+    "ios": {
+      "modulesProvider": {
+        "BsDiffPatch": "BsDiffPatch"
+      }
+    }
   }
 }

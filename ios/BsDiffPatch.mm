@@ -1,7 +1,27 @@
 #import "BsDiffPatch.h"
 
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <memory>
+#import <ReactCommon/RCTTurboModule.h>
+#endif
+
 @implementation BsDiffPatch
 RCT_EXPORT_MODULE()
+
++ (BOOL)requiresMainQueueSetup
+{
+    return NO;
+}
+
+- (dispatch_queue_t)methodQueue
+{
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("com.jimmydaddy.bsdiffpatch.worker", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
 
 // Example method
 // See // https://reactnative.dev/docs/native-modules-ios
@@ -88,5 +108,13 @@ RCT_EXPORT_METHOD(diff:(NSString*) oldFile
     NSNumber *result = @(bsdiffpatch::diffFile(oldFileCString, newFileCString, patchFileCString));
     resolve(result);
 }
+
+#ifdef RCT_NEW_ARCH_ENABLED
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+    return std::make_shared<facebook::react::NativeBsDiffPatchSpecJSI>(params);
+}
+#endif
 
 @end

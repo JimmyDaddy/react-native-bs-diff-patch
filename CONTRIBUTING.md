@@ -66,6 +66,26 @@ Remember to add tests for your change if possible. Run the unit tests by:
 yarn test
 ```
 
+Web implementation changes should also pass:
+
+```sh
+yarn test:web
+yarn test:web:browser
+yarn test:web:metro
+```
+
+Documentation and site changes should pass:
+
+```sh
+yarn site:build
+yarn site:test
+yarn site:test:browser
+```
+
+Public English guides live in `docs/`, with their Chinese mirrors in
+`docs/zh-CN/`. Keep both languages aligned when a change affects API behavior,
+platform support, errors, or operational guidance.
+
 ### Commit message convention
 
 We follow the [conventional commits specification](https://www.conventionalcommits.org/en) for our commit messages:
@@ -89,13 +109,26 @@ Our pre-commit hooks verify that the linter and tests pass when committing.
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
+We use [release-it](https://github.com/release-it/release-it) to bump the
+version, create the tag, and publish the GitHub Release. Publishing that release
+starts `.github/workflows/npm-publish.yml`, which publishes to npm through OIDC
+Trusted Publishing and verifies the package provenance. No long-lived npm token
+is stored in GitHub.
 
-To publish new versions, run the following:
+Maintainers should run the quality gates, then create the release:
 
 ```sh
+yarn prepare
+yarn typecheck
+yarn lint
+yarn test --runInBand
 yarn release
 ```
+
+The npm package already trusts the `JimmyDaddy/react-native-bs-diff-patch`
+repository and the `npm-publish.yml` workflow. No npm-side configuration is
+required for a release. The release tag must exactly match
+`v<package.json version>`.
 
 ### Scripts
 
@@ -108,6 +141,13 @@ The `package.json` file contains various scripts for common tasks:
 - `yarn example start`: start the Metro server for the example app.
 - `yarn example android`: run the example app on Android.
 - `yarn example ios`: run the example app on iOS.
+- `yarn build:web`: regenerate the checked-in WebAssembly bundle with Emscripten.
+- `yarn test:web`: verify the WebAssembly patch format and round trip.
+- `yarn test:web:browser`: exercise the public Web Worker API in Chrome.
+- `yarn test:web:metro`: verify Metro resolves the React Native Web entry.
+- `yarn site:build`: render public Markdown and static site assets into `site-dist/`.
+- `yarn site:test`: validate site structure and local links.
+- `yarn site:test:browser`: verify the live Playground, docs, and mobile viewport.
 
 ### Sending a pull request
 

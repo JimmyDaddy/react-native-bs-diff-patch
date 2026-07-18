@@ -12,47 +12,58 @@ export default function App() {
 
   const [textLength, setTextLength] = React.useState<number | undefined>();
   const [patchFileUri, setPatchFileUri] = React.useState<string | undefined>();
+  const [runtimeStatus, setRuntimeStatus] = React.useState('running');
 
   React.useEffect(() => {
-    FS.writeFile(
-      FS.DocumentDirectoryPath + '/test.txt',
-      new Array(10000).fill('Hello World').join(' | ')
-    )
-      .then(async () => {
-        try {
-          await FS.writeFile(
-            FS.DocumentDirectoryPath + '/test1.txt',
-            new Array(10000).fill('Hello World 1').join(' | ')
-          );
+    const oldContent = new Array(1000).fill('Hello World').join(' | ');
+    const expectedContent = new Array(1000).fill('Hello World 1').join(' | ');
+    let cancelled = false;
 
-          let patchFileExists = await FS.exists(patchFile);
+    async function runRoundTrip() {
+      try {
+        await FS.writeFile(oldFile, oldContent);
+        await FS.writeFile(newFile, expectedContent);
 
-          if (patchFileExists) {
-            await FS.unlink(patchFile);
-          }
-          console.log('write done');
-          await diff(oldFile, newFile, patchFile);
-          console.log('diff done', patchFile, oldFile, newFile);
-          patchFileExists = await FS.exists(patchFile);
-          console.log('start patch', patchFileExists);
-          const patchFileInfoInner = await FS.stat(patchFile);
-          setPatchFileUri(patchFileInfoInner.path);
-          const newFile1InfoExists = await FS.exists(newFile1);
-          if (newFile1InfoExists) {
-            await FS.unlink(newFile1);
-          }
-          await patch(oldFile, newFile1, patchFile);
-          console.log('patch done');
-          const t = await FS.readFile(newFile1);
-          setTextLength(t.length);
-        } catch (error) {
-          console.log(error);
+        if (await FS.exists(patchFile)) {
+          await FS.unlink(patchFile);
         }
-      })
-      .catch((e) => {
-        console.log(e);
-      });
+        if (await FS.exists(newFile1)) {
+          await FS.unlink(newFile1);
+        }
+
+        const diffResult = await diff(oldFile, newFile, patchFile);
+        const patchFileInfo = await FS.stat(patchFile);
+        const patchResult = await patch(oldFile, newFile1, patchFile);
+        const patchedContent = await FS.readFile(newFile1);
+
+        if (
+          diffResult !== 0 ||
+          patchResult !== 0 ||
+          patchedContent !== expectedContent
+        ) {
+          throw new Error(
+            'diff/patch round trip produced an unexpected result'
+          );
+        }
+
+        if (!cancelled) {
+          setPatchFileUri(patchFileInfo.path);
+          setTextLength(patchedContent.length);
+          setRuntimeStatus('success');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          setRuntimeStatus(`error: ${message}`);
+        }
+      }
+    }
+
+    runRoundTrip();
+
     return () => {
+      cancelled = true;
       FS.exists(oldFile).then((exists) => {
         if (exists) {
           FS.unlink(oldFile);
@@ -70,6 +81,7 @@ export default function App() {
     <View style={styles.container}>
       <Text>Text: {textLength}</Text>
       <Text>Patch: {patchFileUri}</Text>
+      <Text testID="runtime-status">Runtime: {runtimeStatus}</Text>
     </View>
   );
 }

@@ -1,21 +1,6 @@
-import { NativeModules, Platform } from 'react-native';
+import BsDiffPatch from './NativeBsDiffPatch';
 
-const LINKING_ERROR =
-  `The package 'react-native-bs-diff-patch' doesn't seem to be linked. Make sure: \n\n` +
-  Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
-  '- You rebuilt the app after installing the package\n' +
-  '- You are not using Expo Go\n';
-
-const BsDiffPatch = NativeModules.BsDiffPatch
-  ? NativeModules.BsDiffPatch
-  : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR);
-        },
-      }
-    );
+export type BinaryInput = ArrayBuffer | ArrayBufferView | Blob;
 
 /**
  * generate new file from old file and patch file
@@ -44,4 +29,32 @@ export function diff(
   patchFile: string
 ): Promise<number> {
   return BsDiffPatch.diff(oldFile, newFile, patchFile);
+}
+
+function rejectWebOnlyApi(methodName: string): Promise<never> {
+  const error = new Error(
+    `${methodName} is only available on Web; use diff/patch with file paths on native platforms`
+  ) as Error & { code: string };
+  error.code = 'EUNSUPPORTED';
+  return Promise.reject(error);
+}
+
+/**
+ * Generate a binary patch in a browser Web Worker.
+ */
+export function diffBytes(
+  _oldData: BinaryInput,
+  _newData: BinaryInput
+): Promise<Uint8Array> {
+  return rejectWebOnlyApi('diffBytes');
+}
+
+/**
+ * Apply a binary patch in a browser Web Worker.
+ */
+export function patchBytes(
+  _oldData: BinaryInput,
+  _patchData: BinaryInput
+): Promise<Uint8Array> {
+  return rejectWebOnlyApi('patchBytes');
 }
