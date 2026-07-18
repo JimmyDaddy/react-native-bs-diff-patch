@@ -77,5 +77,20 @@ For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 2. Inspect `npm pack --dry-run --ignore-scripts` and confirm `web/` is present.
 3. Confirm public docs match the exported TypeScript declarations.
 4. Confirm English and Chinese public guides describe the same behavior.
-5. Use the repository release command to create the version and tag.
-6. Verify the npm package and GitHub release before announcing availability.
+5. Use `yarn release` to create the version, tag, and GitHub Release. It does not
+   publish directly to npm.
+6. Publishing the GitHub Release starts `npm-publish.yml`. The workflow checks
+   that the tag matches `package.json`, runs the release gates, publishes through
+   npm Trusted Publishing, and verifies the provenance attestation.
+7. Verify the npm package and GitHub Release before announcing availability.
+
+The npm package's Trusted Publisher is already configured with these values:
+
+- Provider: GitHub Actions.
+- Organization or user: `JimmyDaddy`.
+- Repository: `react-native-bs-diff-patch`.
+- Workflow filename: `npm-publish.yml`.
+- Environment: leave empty.
+
+No npm-side change is required for a normal release, and the workflow does not
+use a long-lived npm token.

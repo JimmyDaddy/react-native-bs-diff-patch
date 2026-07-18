@@ -1,386 +1,424 @@
 name: CI
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '17 3 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  install-dep:
-    runs-on: macos-latest
-    name: Install dependencies
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.changes.outputs.android }}
+      ios: ${{ steps.changes.outputs.ios }}
+      quality: ${{ steps.changes.outputs.quality }}
+      site: ${{ steps.changes.outputs.site }}
+      web: ${{ steps.changes.outputs.web }}
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v4
-
-      - name: Verify Dev Changed files
-        uses: tj-actions/changed-files@v46
-        id: verify-dev-changed-files
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          files: |
-            !*.md
-            !*.MD
-            !*.yml
+          fetch-depth: 0
 
-      - uses: actions/cache@v4
-        name: Cache node_modules
-        id: cache-node-modules
-        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-        with:
-          path: |
-            node_modules
-            example/node_modules
-          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
-
-      - name: Set up Ruby
-        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 2.7
-          bundler-cache: true
-
-      - name: Setup node
-        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install yarn
-        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-        run: npm install -g yarn@1.22.10
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true' && steps.verify-dev-changed-files.outputs.any_changed == 'true'
+      - name: Classify changed files
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          yarn
+          android=false
+          ios=false
+          quality=false
+          site=false
+          web=false
+
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            android=true
+            ios=true
+            quality=true
+            site=true
+            web=true
+          else
+            while IFS= read -r file; do
+              case "$file" in
+                .github/workflows/ci.yml|.github/actions/**|package.json|yarn.lock|.yarnrc.yml|.yarn/releases/**|.nvmrc)
+                  android=true
+                  ios=true
+                  quality=true
+                  site=true
+                  web=true
+                  ;;
+                src/**|cpp/**|assets/**)
+                  android=true
+                  ios=true
+                  quality=true
+                  web=true
+                  ;;
+                android/**|example/android/**)
+                  android=true
+                  quality=true
+                  ;;
+                ios/**|example/ios/**|*.podspec)
+                  ios=true
+                  quality=true
+                  ;;
+                example/src/**|example/e2e/**)
+                  android=true
+                  ios=true
+                  quality=true
+                  ;;
+                web/**|scripts/build-web-wasm.sh|scripts/test-web*.mjs|scripts/web-*)
+                  web=true
+                  quality=true
+                  site=true
+                  ;;
+                site/**|docs/**|README*.md|CONTRIBUTING.md|scripts/build-site.mjs|scripts/test-site*.mjs|.github/workflows/pages.yml)
+                  site=true
+                  ;;
+                *.md)
+                  site=true
+                  ;;
+                *)
+                  # Unknown repository changes run every gate instead of risking a false skip.
+                  android=true
+                  ios=true
+                  quality=true
+                  site=true
+                  web=true
+                  ;;
+              esac
+            done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          fi
+
+          {
+            echo "android=$android"
+            echo "ios=$ios"
+            echo "quality=$quality"
+            echo "site=$site"
+            echo "web=$web"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo '### CI change classification'
+            echo
+            echo "| Gate | Run |"
+            echo "| --- | --- |"
+            echo "| Android | $android |"
+            echo "| iOS | $ios |"
+            echo "| Core quality | $quality |"
+            echo "| Site | $site |"
+            echo "| Web | $web |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   android-build:
-    runs-on: macos-latest
     name: Android Build (newArch=${{ matrix.new-arch }})
-    needs: install-dep
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         new-arch: [false, true]
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Verify Android Changed files
-        uses: tj-actions/changed-files@v46
-        id: verify-android-changed-files
-        with:
-          files: |
-            android/**
-            src/**
-            assets/**
-            package.json
-            example/android/**
-            example/src/**
-            !example/ios/**
-            example/e2e/**
-
-      - uses: actions/cache@v4
-        name: Cache node_modules
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        id: cache-node-modules
-        with:
-          path: |
-            node_modules
-            example/node_modules
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
-
-      - uses: actions/cache@v4
-        id: cache-gradle
-        name: Cache Gradle dependencies
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ matrix.new-arch }}-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/**/*.kt') }}
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        with:
-          ruby-version: 2.7
-          bundler-cache: true
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        with:
-          node-version: '18'
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
-          distribution: 'zulu'
+          distribution: zulu
           java-version: 17
 
-      - name: Install Gradle dependencies
-        if: steps.cache-gradle.outputs.cache-hit != 'true' && steps.verify-android-changed-files.outputs.any_changed == 'true'
-        run: |
-          cd example/android
-          ./gradlew build --stacktrace -PnewArchEnabled=${{ matrix.new-arch }}
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+        with:
+          cache-provider: basic
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Run unit tests
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        run: |
-          cd example/android
-          ./gradlew test --stacktrace -PnewArchEnabled=${{ matrix.new-arch }}
+      - name: Build package
+        run: yarn prepare
 
-      - name: Build APK
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      - name: Build Android and run unit tests
+        working-directory: example/android
         run: |
-          npm run prepare
-          cd example/android
-          ./gradlew assembleRelease -PnewArchEnabled=${{ matrix.new-arch }}
+          ./gradlew test assembleRelease --stacktrace -PnewArchEnabled=${{ matrix.new-arch }}
           mv app/build/outputs/apk/release/app-release.apk app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
 
-      - name: Upload APK
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        uses: actions/upload-artifact@v4
+      - name: Upload Android reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
-          path: ${{ github.workspace }}/example/android/app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
+          name: Android-Build-Reports-new-arch-${{ matrix.new-arch }}
+          path: example/android/**/build/reports
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload APK
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}
+          path: example/android/app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
+          if-no-files-found: error
+          retention-days: 7
 
   android-api-level-test:
-    runs-on: macos-latest
-    needs: android-build
     name: Android New Architecture Runtime Test (API ${{ matrix.api-level }})
+    needs: [changes, android-build]
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
-      fail-fast: false
+      fail-fast: ${{ github.event_name == 'pull_request' }}
+      max-parallel: 2
       matrix:
-        api-level: [24, 25, 29, 30, 31]
-        target: [default]
+        api-level: ${{ fromJSON(github.event_name == 'pull_request' && '[24,31]' || '[24,25,29,30,31]') }}
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Verify Android Changed files
-        uses: tj-actions/changed-files@v46
-        id: verify-android-changed-files
-        with:
-          files: |
-            android/**
-            src/**
-            assets/**
-            package.json
-            example/android/**
-            example/src/**
-            !example/ios/**
-            example/e2e/**
-
-      - uses: actions/cache@v4
-        name: Cache node_modules
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        id: cache-node-modules
-        with:
-          path: |
-            node_modules
-            example/node_modules
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
-
-      - uses: actions/cache@v4
-        name: Cache Gradle dependencies
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        id: cache-gradle
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-gradle-new-arch-runtime-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/**/*.kt', 'example/android/**/*.kt', 'example/android/**/*.gradle') }}
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        with:
-          ruby-version: 2.7
-          bundler-cache: true
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-        with:
-          node-version: '18'
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
-          distribution: 'zulu'
+          distribution: zulu
           java-version: 17
 
-      - name: Instrumentation Tests
-        uses: reactivecircus/android-emulator-runner@v2
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+        with:
+          cache-provider: basic
+          cache-read-only: true
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Build package
+        run: yarn prepare
+
+      - name: Run instrumentation tests
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api-level }}
-          target: ${{ matrix.target }}
+          target: default
           arch: x86_64
           profile: Nexus 6
-          script: |
-            cd example/android && ./gradlew :app:connectedReleaseAndroidTest --stacktrace -PnewArchEnabled=true -PreactNativeArchitectures=x86_64
+          script: cd example/android && ./gradlew :app:connectedReleaseAndroidTest --stacktrace -PnewArchEnabled=true -PreactNativeArchitectures=x86_64
 
-      - name: Upload Reports
-        uses: actions/upload-artifact@v4
-        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+      - name: Upload instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: New-Arch-Runtime-Test-Reports-${{ matrix.api-level }}-${{ matrix.target }}
-          path: ${{ github.workspace }}/example/android/app/build/reports
+          name: New-Arch-Runtime-Test-Reports-${{ matrix.api-level }}
+          path: |
+            example/android/app/build/reports
+            example/android/app/build/outputs/androidTest-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   ios-build-test:
-    runs-on: macos-latest
-    needs: install-dep
-    name: iOS Build and Test
+    name: iOS (CocoaPods ${{ matrix.cocoapods }}, newArch=${{ matrix.new-arch }})
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: macos-14
+    timeout-minutes: 45
     strategy:
-      fail-fast: false
+      fail-fast: ${{ github.event_name == 'pull_request' }}
+      max-parallel: 2
       matrix:
-        cocoapods: ['1.10.1', '1.11.0', '1.14.3']
+        cocoapods: ${{ fromJSON(github.event_name == 'pull_request' && '["1.14.3"]' || '["1.10.1","1.11.0","1.14.3"]') }}
         new-arch: ['0', '1']
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Verify iOS Changed files
-        uses: tj-actions/changed-files@v46
-        id: verify-iOS-changed-files
-        with:
-          files: |
-            ios/**
-            src/**
-            assets/**
-            package.json
-            !example/android/**
-            example/e2e/**
-
-      - uses: actions/cache@v4
-        name: Cache node_modules
-        id: cache-node-modules
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        with:
-          path: |
-            node_modules
-            example/node_modules
-          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
-          fail-on-cache-miss: true
-
-      - name: Cache Pods
-        id: cache-pods
-        uses: actions/cache@v4
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        with:
-          path: example/ios/Pods
-          key: ${{ runner.os }}-pods-${{ matrix.cocoapods }}-new-arch-${{ matrix.new-arch }}-${{ hashFiles('**/Podfile.lock') }}
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1
         with:
-          ruby-version: 2.7
-          bundler-cache: true
+          ruby-version: '2.7'
+          bundler-cache: ${{ matrix.cocoapods == '1.14.3' }}
+          working-directory: example
 
-      - name: Install Cocoapods
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        run: gem install cocoapods -v ${{ matrix.cocoapods }}
-
-      - name: Setup node
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install Pods
-        if: steps.cache-pods.outputs.cache-hit != 'true' && steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+      - name: Install compatibility Ruby gems
+        if: matrix.cocoapods != '1.14.3'
         run: |
-          cd example/ios
-          pod cache clean --all
-          RCT_NEW_ARCH_ENABLED=${{ matrix.new-arch }} pod install
+          gem install ffi -v 1.17.4 --no-document
+          gem install cocoapods -v ${{ matrix.cocoapods }} --no-document
+          gem install xcpretty -v 0.3.0 --no-document
 
-      - name: Install xcpretty
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        run: gem install xcpretty
-
-      - name: Build
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        run: |
-          cd example/ios
-          xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' | xcpretty
-
-      - name: Test
-        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-        run: |
-          cd example/ios
-          xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15' test | xcpretty
-
-  web-test:
-    runs-on: macos-latest
-    needs: install-dep
-    name: Web WASM and Browser Test
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-
-      - name: Verify Web Changed files
-        uses: tj-actions/changed-files@v46
-        id: verify-web-changed-files
-        with:
-          files: |
-            cpp/**
-            src/**
-            web/**
-            scripts/build-web-wasm.sh
-            scripts/test-web.mjs
-            scripts/test-web-browser.mjs
-            scripts/test-web-metro.mjs
-            scripts/web-metro-entry.js
-            scripts/web-test.html
-            package.json
-            yarn.lock
-
-      - uses: actions/cache@v4
-        name: Cache node_modules
-        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+      - name: Cache Pods
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
-            node_modules
-            example/node_modules
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
+            example/ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-no-flipper-${{ matrix.cocoapods }}-new-arch-${{ matrix.new-arch }}-${{ hashFiles('example/ios/Podfile.lock', 'example/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-no-flipper-${{ matrix.cocoapods }}-new-arch-${{ matrix.new-arch }}-
 
-      - name: Setup node
-        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-node@v4
+      - name: Install Pods
+        env:
+          COCOAPODS_VERSION: ${{ matrix.cocoapods }}
+          NO_FLIPPER: '1'
+          RCT_NEW_ARCH_ENABLED: ${{ matrix.new-arch }}
+        run: |
+          cd example/ios
+          if [[ "$COCOAPODS_VERSION" == "1.14.3" ]]; then
+            bundle exec pod install
+          else
+            pod install
+          fi
+
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          simulator_udid="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          if [[ -z "$simulator_udid" ]]; then
+            echo 'No available iPhone simulator was found' >&2
+            exit 1
+          fi
+          echo "udid=$simulator_udid" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          COCOAPODS_VERSION: ${{ matrix.cocoapods }}
+        run: |
+          set -o pipefail
+          cd example/ios
+          if [[ "$COCOAPODS_VERSION" == "1.14.3" ]]; then
+            xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' | bundle exec xcpretty
+          else
+            xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' | xcpretty
+          fi
+
+      - name: Test
+        env:
+          COCOAPODS_VERSION: ${{ matrix.cocoapods }}
+          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          set -o pipefail
+          cd example/ios
+          if [[ "$COCOAPODS_VERSION" == "1.14.3" ]]; then
+            xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" test | bundle exec xcpretty
+          else
+            xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" test | xcpretty
+          fi
+
+      - name: Upload iOS test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          node-version: '18'
+          name: iOS-Test-Results-${{ matrix.cocoapods }}-new-arch-${{ matrix.new-arch }}
+          path: ${{ runner.temp }}/ios-tests.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
+  web-test:
+    name: Web WASM and Browser Test
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
 
       - name: Build package
-        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
         run: yarn prepare
 
       - name: Run Web tests
-        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
         run: |
           yarn test:web
           yarn test:web:browser
           yarn test:web:metro
 
       - name: Verify npm package contents
-        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
         run: npm pack --dry-run --ignore-scripts
+
+  quality:
+    name: Lint, TypeScript, and Jest
+    needs: changes
+    if: needs.changes.outputs.quality == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
+
+      - name: Run core quality gates
+        run: |
+          yarn prepare
+          yarn typecheck
+          yarn lint
+          yarn test --runInBand
+
+  site-test:
+    name: Documentation Site and Playground Test
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
+
+      - name: Build documentation site
+        run: yarn site:build
+
+      - name: Validate site and Playground
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          yarn site:test
+          yarn site:test:browser
 
   ci-complete:
     name: Complete CI
-    needs: [android-build, android-api-level-test, ios-build-test, web-test]
-    if: ${{ always() }}
+    needs: [changes, quality, android-build, android-api-level-test, ios-build-test, web-test, site-test]
+    if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Check all job status
-        if: >-
-          ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+      - name: Check all job statuses
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
+
+      - name: Confirm completion
+        if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+        run: echo 'All required CI gates completed successfully.'

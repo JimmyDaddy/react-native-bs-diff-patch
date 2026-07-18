@@ -1,0 +1,108 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish-npm:
+    name: Publish to npm with OIDC
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js for trusted publishing
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+
+      - name: Setup package managers
+        run: |
+          corepack enable
+          npm install --global npm@12.0.1
+
+      - name: Install dependencies without release caches
+        run: yarn install --immutable
+
+      - name: Verify release identity
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "$RELEASE_TAG" != "v$package_version" ]]; then
+            echo "Release tag $RELEASE_TAG does not match package version $package_version" >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "Release tag $RELEASE_TAG is not reachable from main" >&2
+            exit 1
+          fi
+
+          published_version="$(npm view "react-native-bs-diff-patch@$package_version" version 2>/dev/null || true)"
+          if [[ "$published_version" == "$package_version" ]]; then
+            echo "react-native-bs-diff-patch@$package_version is already published" >&2
+            exit 1
+          fi
+
+          if [[ "$package_version" == *-* ]]; then
+            prerelease="${package_version#*-}"
+            dist_tag="${prerelease%%.*}"
+          else
+            dist_tag=latest
+          fi
+          if [[ ! "$dist_tag" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            echo "Derived npm dist-tag $dist_tag is invalid" >&2
+            exit 1
+          fi
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+
+      - name: Run release quality gates
+        run: |
+          yarn prepare
+          yarn typecheck
+          yarn lint
+          yarn test --runInBand
+          yarn test:web
+          yarn test:web:browser
+          yarn test:web:metro
+          npm pack --dry-run --ignore-scripts
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+      - name: Publish with provenance
+        env:
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+        run: npm publish --provenance --access public --tag "$DIST_TAG"
+
+      - name: Verify registry provenance metadata
+        run: |
+          package_version="${{ steps.release.outputs.package_version }}"
+          for _ in $(seq 1 12); do
+            predicate_type="$(npm view "react-native-bs-diff-patch@$package_version" dist.attestations.provenance.predicateType 2>/dev/null || true)"
+            if [[ "$predicate_type" == "https://slsa.dev/provenance/v1" ]]; then
+              echo "Verified provenance for react-native-bs-diff-patch@$package_version"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Published package did not expose provenance metadata in time.' >&2
+          exit 1

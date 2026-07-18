@@ -75,5 +75,18 @@ Android CI 构建两种架构模式，并在模拟器矩阵执行新架构设备
 2. 检查 `npm pack --dry-run --ignore-scripts`，确认包含 `web/`。
 3. 确认公开文档与导出的 TypeScript 声明一致。
 4. 确认中英文指南描述同一套公开行为。
-5. 通过仓库 release 命令创建版本和 tag。
-6. 对外发布前验证 npm 包和 GitHub release。
+5. 运行 `yarn release` 创建版本、tag 和 GitHub Release；该命令不直接发布 npm。
+6. GitHub Release 发布后会触发 `npm-publish.yml`。工作流校验 tag 与
+   `package.json` 版本一致，执行发布门禁，通过 npm Trusted Publishing 发布，
+   并验证 provenance 证明。
+7. 对外发布前验证 npm 包和 GitHub Release。
+
+npm 包的 Trusted Publisher 已按以下值配置完成：
+
+- Provider：GitHub Actions。
+- Organization or user：`JimmyDaddy`。
+- Repository：`react-native-bs-diff-patch`。
+- Workflow filename：`npm-publish.yml`。
+- Environment：留空。
+
+正常发布无需再修改 npm 侧配置，工作流也不使用长期 npm token。

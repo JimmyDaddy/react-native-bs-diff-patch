@@ -109,13 +109,26 @@ Our pre-commit hooks verify that the linter and tests pass when committing.
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
+We use [release-it](https://github.com/release-it/release-it) to bump the
+version, create the tag, and publish the GitHub Release. Publishing that release
+starts `.github/workflows/npm-publish.yml`, which publishes to npm through OIDC
+Trusted Publishing and verifies the package provenance. No long-lived npm token
+is stored in GitHub.
 
-To publish new versions, run the following:
+Maintainers should run the quality gates, then create the release:
 
 ```sh
+yarn prepare
+yarn typecheck
+yarn lint
+yarn test --runInBand
 yarn release
 ```
+
+The npm package already trusts the `JimmyDaddy/react-native-bs-diff-patch`
+repository and the `npm-publish.yml` workflow. No npm-side configuration is
+required for a release. The release tag must exactly match
+`v<package.json version>`.
 
 ### Scripts
 
