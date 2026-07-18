@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BsDiffPatch Web Test</title>
+  </head>
+  <body data-status="running">
+    <main>
+      <h1>BsDiffPatch Web Test</h1>
+      <p id="status">Running…</p>
+    </main>
+    <script type="module">
+      import { diff, diffBytes, patchBytes } from '../web/index.mjs';
+
+      const status = document.querySelector('#status');
+      const encoder = new TextEncoder();
+      const oldData = encoder.encode('old browser data\n'.repeat(128));
+      const oldDataSnapshot = oldData.slice();
+      const newData = encoder.encode(
+        'new browser data\n'.repeat(96) + 'worker round trip\n'.repeat(32)
+      );
+
+      try {
+        const patchData = await diffBytes(new Blob([oldData]), newData);
+        const restoredData = await patchBytes(oldData.buffer, patchData);
+        const restoredMatches =
+          restoredData.length === newData.length &&
+          restoredData.every((value, index) => value === newData[index]);
+        const inputsPreserved = oldData.every(
+          (value, index) => value === oldDataSnapshot[index]
+        );
+
+        let pathApiErrorCode;
+        try {
+          await diff('/old', '/new', '/patch');
+        } catch (error) {
+          pathApiErrorCode = error.code;
+        }
+
+        let invalidInputErrorCode;
+        try {
+          await diffBytes('not binary data', newData);
+        } catch (error) {
+          invalidInputErrorCode = error.code;
+        }
+
+        if (
+          !restoredMatches ||
+          !inputsPreserved ||
+          invalidInputErrorCode !== 'EINVAL' ||
+          pathApiErrorCode !== 'EUNSUPPORTED'
+        ) {
+          throw new Error('browser assertions failed');
+        }
+
+        window.__bsdiffWebTestResult = {
+          inputsPreserved,
+          invalidInputErrorCode,
+          patchLength: patchData.length,
+          pathApiErrorCode,
+          restoredMatches,
+        };
+        document.body.dataset.status = 'passed';
+        status.textContent = 'Passed';
+      } catch (error) {
+        window.__bsdiffWebTestResult = {
+          error: error instanceof Error ? error.message : String(error),
+        };
+        document.body.dataset.status = 'failed';
+        status.textContent = `Failed: ${window.__bsdiffWebTestResult.error}`;
+      }
+    </script>
+  </body>
+</html>

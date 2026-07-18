@@ -9,6 +9,8 @@ import com.facebook.react.module.annotations.ReactModule
 @ReactModule(name = BsDiffPatchNative.NAME)
 class BsDiffPatchModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
+  private val taskRunner = BsDiffPatchTaskRunner()
+
   override fun getName(): String = BsDiffPatchNative.NAME
 
   @ReactMethod
@@ -41,12 +43,11 @@ class BsDiffPatchModule(reactContext: ReactApplicationContext) :
   }
 
   private fun execute(promise: Promise, block: () -> Int) {
-    try {
-      promise.resolve(block())
-    } catch (error: BsDiffPatchException) {
-      promise.reject(error.code, error.message, error)
-    } catch (error: Exception) {
-      promise.reject("EUNSPECIFIED", error.message, error)
-    }
+    taskRunner.execute(promise, block)
+  }
+
+  override fun invalidate() {
+    taskRunner.shutdown()
+    super.invalidate()
   }
 }

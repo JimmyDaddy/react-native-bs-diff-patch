@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Create and apply compatible binary patches across React Native Android, iOS, and Web. Try the WebAssembly playground in your browser."
+    />
+    <meta name="theme-color" content="#060a0d" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="react-native-bs-diff-patch" />
+    <meta
+      property="og:description"
+      content="One compact binary patch format for Android, iOS, and React Native Web."
+    />
+    <meta property="og:url" content="https://bs-dff-patch.corerobin.com/" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="canonical" href="https://bs-dff-patch.corerobin.com/" />
+    <link rel="stylesheet" href="./assets/site.css" />
+    <title>
+      react-native-bs-diff-patch — Binary patches everywhere RN runs
+    </title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="page-grid" aria-hidden="true"></div>
+
+    <header class="site-header shell">
+      <a class="brand" href="./" aria-label="react-native-bs-diff-patch home">
+        <span class="brand-mark" aria-hidden="true">BΔ</span>
+        <span>react-native-bs-diff-patch</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#playground">Playground</a>
+        <a href="#architecture">Architecture</a>
+        <a href="./docs/">Docs</a>
+        <a
+          class="github-link"
+          href="https://github.com/JimmyDaddy/react-native-bs-diff-patch"
+          rel="noreferrer"
+        >
+          <span class="status-dot" aria-hidden="true"></span>
+          GitHub
+        </a>
+      </nav>
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="Open navigation"
+      >
+        Menu
+      </button>
+    </header>
+
+    <main id="main" class="shell">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Native C core · WebAssembly worker</p>
+          <h1 id="hero-title">
+            Binary deltas.<br />
+            <span class="headline-accent">Everywhere RN</span><br />
+            runs.
+          </h1>
+          <p class="lede">
+            Create and apply compact binary patches across iOS, Android, and
+            React Native Web—with one compatible patch format and typed API.
+          </p>
+
+          <ul class="platform-list" aria-label="Supported platforms">
+            <li><span></span>iOS · ObjC++</li>
+            <li><span></span>Android · JNI</li>
+            <li class="web"><span></span>Web · WASM</li>
+            <li><span></span>New Architecture</li>
+          </ul>
+
+          <div class="install-row">
+            <span class="prompt" aria-hidden="true">$</span>
+            <code>npm i react-native-bs-diff-patch</code>
+            <button
+              class="copy-button"
+              type="button"
+              data-copy="npm i react-native-bs-diff-patch"
+              aria-label="Copy install command"
+            >
+              Copy
+            </button>
+          </div>
+
+          <div class="code-window" aria-label="React Native Web quick start">
+            <div class="window-bar">
+              <span>quick-start.ts</span>
+              <span class="window-lights" aria-hidden="true"
+                ><i></i><i></i><i></i
+              ></span>
+            </div>
+            <pre><code><span class="token-keyword">import</span> { <span class="token-function">diffBytes</span>, <span class="token-function">patchBytes</span> } <span class="token-keyword">from</span> <span class="token-string">'react-native-bs-diff-patch'</span>;
+
+<span class="token-keyword">const</span> delta = <span class="token-keyword">await</span> <span class="token-function">diffBytes</span>(oldBytes, newBytes);
+<span class="token-keyword">const</span> restored = <span class="token-keyword">await</span> <span class="token-function">patchBytes</span>(oldBytes, delta);</code></pre>
+          </div>
+        </div>
+
+        <section
+          id="playground"
+          class="playground"
+          aria-labelledby="playground-title"
+        >
+          <div class="live-badge">Live / WASM</div>
+          <header class="playground-header">
+            <div>
+              <p class="section-kicker">Try the real implementation</p>
+              <h2 id="playground-title">Patch playground</h2>
+            </div>
+            <span id="runtime-state" class="runtime-state" data-state="loading">
+              Loading runtime
+            </span>
+          </header>
+
+          <div class="editors">
+            <label class="editor-panel" for="old-payload">
+              <span class="editor-label">
+                <strong>01 / Old payload</strong>
+                <output id="old-size">0 B</output>
+              </span>
+              <textarea id="old-payload" spellcheck="false">
+{
+  "release": "1.4.0",
+  "features": ["native", "fast"],
+  "rollout": 25
+}</textarea
+              >
+            </label>
+            <label class="editor-panel" for="new-payload">
+              <span class="editor-label">
+                <strong>02 / New payload</strong>
+                <output id="new-size">0 B</output>
+              </span>
+              <textarea id="new-payload" spellcheck="false">
+{
+  "release": "1.5.0",
+  "features": ["native", "web", "fast"],
+  "rollout": 100
+}</textarea
+              >
+            </label>
+          </div>
+
+          <div class="play-actions">
+            <button id="generate-patch" class="primary-button" type="button">
+              Generate patch <span aria-hidden="true">→</span>
+            </button>
+            <div class="worker-note">
+              <strong>Worker isolated</strong>
+              <span>No payload data leaves this page.</span>
+            </div>
+            <button
+              id="download-patch"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              Download .patch
+            </button>
+          </div>
+
+          <div class="metrics" aria-live="polite">
+            <div class="metric">
+              <span>Patch size</span>
+              <strong id="patch-size">—</strong>
+            </div>
+            <div class="metric">
+              <span>Transfer saved</span>
+              <strong id="transfer-saved" class="lime">—</strong>
+            </div>
+            <div class="metric">
+              <span>Runtime</span>
+              <strong id="runtime-ms">—</strong>
+            </div>
+          </div>
+
+          <footer class="playground-footer">
+            <span
+              id="playground-status"
+              class="playground-status"
+              data-state="idle"
+            >
+              <i aria-hidden="true"></i>
+              Ready to generate and verify a patch
+            </span>
+            <span>ENDSLEY / BSDIFF43</span>
+          </footer>
+        </section>
+      </section>
+
+      <section
+        id="architecture"
+        class="architecture"
+        aria-labelledby="architecture-title"
+      >
+        <div class="architecture-intro">
+          <p class="section-kicker">Under the hood</p>
+          <h2 id="architecture-title">One format.<br />Three runtimes.</h2>
+        </div>
+        <ol class="architecture-steps">
+          <li>
+            <span>01</span>
+            <strong>Typed API</strong>
+            <p>Paths on native. Binary inputs on Web.</p>
+          </li>
+          <li>
+            <span>02</span>
+            <strong>Worker boundary</strong>
+            <p>Serial native queues or an isolated module Worker.</p>
+          </li>
+          <li>
+            <span>03</span>
+            <strong>Shared C core</strong>
+            <p>The same bsdiff and bzip2 sources everywhere.</p>
+          </li>
+          <li>
+            <span>04</span>
+            <strong>Compact delta</strong>
+            <p>A compatible `ENDSLEY/BSDIFF43` patch.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="proof-section" aria-labelledby="proof-title">
+        <div class="proof-copy">
+          <p class="section-kicker">Designed for integration</p>
+          <h2 id="proof-title">
+            Native performance.<br />Explicit platform contracts.
+          </h2>
+          <p>
+            Expensive work stays off React Native's module queue and the browser
+            main thread. Unsupported API families reject clearly instead of
+            guessing at filesystem behavior.
+          </p>
+          <a class="text-link" href="./docs/architecture/"
+            >Read the architecture →</a
+          >
+        </div>
+        <div class="proof-grid">
+          <article>
+            <span class="card-number">01</span>
+            <h3>New Architecture ready</h3>
+            <p>
+              Version-aware Android packages and generated iOS TurboModule
+              registration.
+            </p>
+          </article>
+          <article>
+            <span class="card-number">02</span>
+            <h3>Web Worker by default</h3>
+            <p>
+              WASM work runs outside the page thread and terminates after each
+              operation.
+            </p>
+          </article>
+          <article>
+            <span class="card-number">03</span>
+            <h3>Cross-platform patches</h3>
+            <p>
+              Create a patch on one supported runtime and apply it on another.
+            </p>
+          </article>
+          <article>
+            <span class="card-number">04</span>
+            <h3>Release-grade checks</h3>
+            <p>
+              Native matrices, device assertions, browser round trips, Metro and
+              package gates.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="docs-cta" aria-labelledby="docs-title">
+        <div>
+          <p class="section-kicker">Documentation</p>
+          <h2 id="docs-title">From first patch to production boundaries.</h2>
+        </div>
+        <p>
+          Follow platform-specific setup, inspect every API and error code, and
+          understand memory, bundler, and compatibility constraints before you
+          ship.
+        </p>
+        <div class="cta-actions">
+          <a class="primary-link" href="./docs/">Open documentation →</a>
+          <a class="secondary-link" href="./docs/troubleshooting/"
+            >Troubleshooting</a
+          >
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer shell">
+      <div class="brand footer-brand">
+        <span class="brand-mark" aria-hidden="true">BΔ</span>
+        <span>react-native-bs-diff-patch</span>
+      </div>
+      <p>MIT licensed. Built for React Native runtimes.</p>
+      <nav aria-label="Footer navigation">
+        <a href="./docs/">Docs</a>
+        <a href="https://www.npmjs.com/package/react-native-bs-diff-patch"
+          >npm</a
+        >
+        <a href="https://github.com/JimmyDaddy/react-native-bs-diff-patch"
+          >GitHub</a
+        >
+      </nav>
+    </footer>
+
+    <script type="module" src="./assets/playground.js"></script>
+    <script src="./assets/site.js" defer></script>
+  </body>
+</html>

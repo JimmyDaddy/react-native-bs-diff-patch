@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 buildscript {
   def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["BsDiffPatch_kotlinVersion"]
   repositories {
@@ -13,6 +15,31 @@ buildscript {
 
 def isNewArchitectureEnabled() {
   return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
+}
+
+def getReactNativeMinorVersion() {
+  def candidates = [
+    rootProject.file("../node_modules/react-native/package.json"),
+    project.file("../../react-native/package.json")
+  ]
+  def packageJson = candidates.find { it.exists() }
+
+  if (packageJson == null) {
+    throw new GradleException("Unable to resolve react-native/package.json")
+  }
+
+  def version = new JsonSlurper().parseText(packageJson.text).version
+  def match = version =~ /^(\d+)\.(\d+)\./
+
+  if (!match.find()) {
+    throw new GradleException("Unsupported React Native version: ${version}")
+  }
+
+  return match.group(2).toInteger()
+}
+
+def getNewArchitecturePackageSourceDir() {
+  return getReactNativeMinorVersion() >= 74 ? "newarch74/java" : "newarch73/java"
 }
 
 apply plugin: "com.android.library"
@@ -57,7 +84,7 @@ android {
       }
       java.setSrcDirs(
         isNewArchitectureEnabled()
-          ? ["src/main/java", "newarch/java"]
+          ? ["src/main/java", "newarch/java", getNewArchitecturePackageSourceDir()]
           : ["src/main/java", "oldarch/java"]
       )
     }

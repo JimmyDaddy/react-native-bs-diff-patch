@@ -66,6 +66,22 @@ Remember to add tests for your change if possible. Run the unit tests by:
 yarn test
 ```
 
+Web implementation changes should also pass:
+
+```sh
+yarn test:web
+yarn test:web:browser
+yarn test:web:metro
+```
+
+Documentation and site changes should pass:
+
+```sh
+yarn site:build
+yarn site:test
+yarn site:test:browser
+```
+
 ### Commit message convention
 
 We follow the [conventional commits specification](https://www.conventionalcommits.org/en) for our commit messages:
@@ -108,6 +124,13 @@ The `package.json` file contains various scripts for common tasks:
 - `yarn example start`: start the Metro server for the example app.
 - `yarn example android`: run the example app on Android.
 - `yarn example ios`: run the example app on iOS.
+- `yarn build:web`: regenerate the checked-in WebAssembly bundle with Emscripten.
+- `yarn test:web`: verify the WebAssembly patch format and round trip.
+- `yarn test:web:browser`: exercise the public Web Worker API in Chrome.
+- `yarn test:web:metro`: verify Metro resolves the React Native Web entry.
+- `yarn site:build`: render public Markdown and static site assets into `site-dist/`.
+- `yarn site:test`: validate site structure and local links.
+- `yarn site:test:browser`: verify the live Playground, docs, and mobile viewport.
 
 ### Sending a pull request
 

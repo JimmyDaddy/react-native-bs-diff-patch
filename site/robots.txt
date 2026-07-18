@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bs-dff-patch.corerobin.com/sitemap.xml

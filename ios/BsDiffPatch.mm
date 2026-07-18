@@ -8,6 +8,21 @@
 @implementation BsDiffPatch
 RCT_EXPORT_MODULE()
 
++ (BOOL)requiresMainQueueSetup
+{
+    return NO;
+}
+
+- (dispatch_queue_t)methodQueue
+{
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("com.jimmydaddy.bsdiffpatch.worker", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
 // Example method
 // See // https://reactnative.dev/docs/native-modules-ios
 RCT_EXPORT_METHOD(patch:(NSString*) oldFile

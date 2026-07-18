@@ -5,149 +5,154 @@ on:
   workflow_dispatch:
 
 jobs:
-
   install-dep:
     runs-on: macos-latest
     name: Install dependencies
     steps:
-    - name: Checkout the code
-      uses: actions/checkout@v4
+      - name: Checkout the code
+        uses: actions/checkout@v4
 
-    - name: Verify Dev Changed files
-      uses: tj-actions/changed-files@v46
-      id: verify-dev-changed-files
-      with:
-        files: |
-          !*.md
-          !*.MD
-          !*.yml
+      - name: Verify Dev Changed files
+        uses: tj-actions/changed-files@v46
+        id: verify-dev-changed-files
+        with:
+          files: |
+            !*.md
+            !*.MD
+            !*.yml
 
-    - uses: actions/cache@v3
-      name: Cache node_modules
-      id: cache-node-modules
-      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-      with:
-        path: |
-          node_modules
-          example/node_modules
-        key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
+      - uses: actions/cache@v4
+        name: Cache node_modules
+        id: cache-node-modules
+        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+        with:
+          path: |
+            node_modules
+            example/node_modules
+          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
 
-    - name: Set up Ruby
-      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 2.7
-        bundler-cache: true
+      - name: Set up Ruby
+        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+          bundler-cache: true
 
-    - name: Setup node
-      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      - name: Setup node
+        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
+      - name: Install yarn
+        if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
+        run: npm install -g yarn@1.22.10
 
-    - name: Install yarn
-      if: steps.verify-dev-changed-files.outputs.any_changed == 'true'
-      run: npm install -g yarn@1.22.10
-
-    - name: Install dependencies
-      if: steps.cache-node-modules.outputs.cache-hit != 'true' && steps.verify-dev-changed-files.outputs.any_changed == 'true'
-      run: |
-        yarn
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true' && steps.verify-dev-changed-files.outputs.any_changed == 'true'
+        run: |
+          yarn
 
   android-build:
     runs-on: macos-latest
-    name: Android Build
+    name: Android Build (newArch=${{ matrix.new-arch }})
     needs: install-dep
+    strategy:
+      fail-fast: false
+      matrix:
+        new-arch: [false, true]
     steps:
-    - name: Checkout the code
-      uses: actions/checkout@v4
+      - name: Checkout the code
+        uses: actions/checkout@v4
 
-    - name: Verify Android Changed files
-      uses: tj-actions/changed-files@v46
-      id: verify-android-changed-files
-      with:
-        files: |
-          android/**
-          src/**
-          assets/**
-          package.json
-          !example/ios/**
-          example/e2e/**
+      - name: Verify Android Changed files
+        uses: tj-actions/changed-files@v46
+        id: verify-android-changed-files
+        with:
+          files: |
+            android/**
+            src/**
+            assets/**
+            package.json
+            example/android/**
+            example/src/**
+            !example/ios/**
+            example/e2e/**
 
-    - uses: actions/cache@v3
-      name: Cache node_modules
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      id: cache-node-modules
-      with:
-        path: |
-          node_modules
-          example/node_modules
-        fail-on-cache-miss: true
-        key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
+      - uses: actions/cache@v4
+        name: Cache node_modules
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        id: cache-node-modules
+        with:
+          path: |
+            node_modules
+            example/node_modules
+          fail-on-cache-miss: true
+          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
 
-    - uses: actions/cache@v3
-      id: cache-gradle
-      name: Cache Gradle dependencies
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/src/**/*.kt') }}
+      - uses: actions/cache@v4
+        id: cache-gradle
+        name: Cache Gradle dependencies
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ matrix.new-arch }}-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/**/*.kt') }}
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      with:
-        ruby-version: 2.7
-        bundler-cache: true
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          ruby-version: 2.7
+          bundler-cache: true
 
-    - name: Setup node
-      uses: actions/setup-node@v3
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      with:
-        node-version: '18'
+      - name: Setup node
+        uses: actions/setup-node@v4
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          node-version: '18'
 
-    - name: Set up JDK
-      uses: actions/setup-java@v3
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      with:
-        distribution: 'zulu'
-        java-version: 17
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
-    - name: Install Gradle dependencies
-      if: steps.cache-gradle.outputs.cache-hit != 'true' && steps.verify-android-changed-files.outputs.any_changed == 'true'
-      run: |
-        cd example/android
-        ./gradlew build --stacktrace
+      - name: Install Gradle dependencies
+        if: steps.cache-gradle.outputs.cache-hit != 'true' && steps.verify-android-changed-files.outputs.any_changed == 'true'
+        run: |
+          cd example/android
+          ./gradlew build --stacktrace -PnewArchEnabled=${{ matrix.new-arch }}
 
-    - name: Run unit tests
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      run: |
-        cd example/android
-        ./gradlew test --stacktrace
+      - name: Run unit tests
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        run: |
+          cd example/android
+          ./gradlew test --stacktrace -PnewArchEnabled=${{ matrix.new-arch }}
 
-    - name: Build APK
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      run: |
-        npm run prepare
-        cd example/android
-        ./gradlew assembleRelease
-        mv app/build/outputs/apk/release/app-release.apk app-release-${{ github.sha }}.apk
+      - name: Build APK
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        run: |
+          npm run prepare
+          cd example/android
+          ./gradlew assembleRelease -PnewArchEnabled=${{ matrix.new-arch }}
+          mv app/build/outputs/apk/release/app-release.apk app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
 
-    - name: Upload APK
-      if: steps.verify-android-changed-files.outputs.any_changed == 'true'
-      uses: actions/upload-artifact@v3
-      with:
-        name: app-release-${{ github.sha }}.apk
-        path:  ${{ github.workspace }}/example/android/app-release-${{ github.sha }}.apk
+      - name: Upload APK
+        if: steps.verify-android-changed-files.outputs.any_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
+          path: ${{ github.workspace }}/example/android/app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
 
   android-api-level-test:
     runs-on: macos-latest
     needs: android-build
-    name: Android Test
+    name: Android New Architecture Runtime Test (API ${{ matrix.api-level }})
     strategy:
+      fail-fast: false
       matrix:
         api-level: [24, 25, 29, 30, 31]
         target: [default]
@@ -164,10 +169,12 @@ jobs:
             src/**
             assets/**
             package.json
+            example/android/**
+            example/src/**
             !example/ios/**
             example/e2e/**
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache node_modules
         if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         id: cache-node-modules
@@ -178,7 +185,7 @@ jobs:
           fail-on-cache-miss: true
           key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache Gradle dependencies
         if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         id: cache-gradle
@@ -187,7 +194,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           fail-on-cache-miss: true
-          key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/src/**/*.kt') }}
+          key: ${{ runner.os }}-gradle-new-arch-runtime-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('android/**/*.kt', 'example/android/**/*.kt', 'example/android/**/*.gradle') }}
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -197,13 +204,13 @@ jobs:
           bundler-cache: true
 
       - name: Setup node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         with:
           node-version: '18'
 
       - name: Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         with:
           distribution: 'zulu'
@@ -218,100 +225,158 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
-            cd example/android && ./gradlew connectedCheck  --stacktrace
+            cd example/android && ./gradlew :app:connectedReleaseAndroidTest --stacktrace -PnewArchEnabled=true -PreactNativeArchitectures=x86_64
 
       - name: Upload Reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: steps.verify-android-changed-files.outputs.any_changed == 'true'
         with:
-          name: Test-Reports
-          path:  ${{ github.workspace }}/example/android/app/build/reports
+          name: New-Arch-Runtime-Test-Reports-${{ matrix.api-level }}-${{ matrix.target }}
+          path: ${{ github.workspace }}/example/android/app/build/reports
 
   ios-build-test:
     runs-on: macos-latest
     needs: install-dep
     name: iOS Build and Test
     strategy:
+      fail-fast: false
       matrix:
         cocoapods: ['1.10.1', '1.11.0', '1.14.3']
+        new-arch: ['0', '1']
     steps:
-    - name: Checkout the code
-      uses: actions/checkout@v4
+      - name: Checkout the code
+        uses: actions/checkout@v4
 
-    - name: Verify iOS Changed files
-      uses: tj-actions/changed-files@v46
-      id: verify-iOS-changed-files
-      with:
-        files: |
-          ios/**
-          src/**
-          assets/**
-          package.json
-          !example/android/**
-          example/e2e/**
+      - name: Verify iOS Changed files
+        uses: tj-actions/changed-files@v46
+        id: verify-iOS-changed-files
+        with:
+          files: |
+            ios/**
+            src/**
+            assets/**
+            package.json
+            !example/android/**
+            example/e2e/**
 
-    - uses: actions/cache@v3
-      name: Cache node_modules
-      id: cache-node-modules
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      with:
-        path: |
-          node_modules
-          example/node_modules
-        key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
-        fail-on-cache-miss: true
+      - uses: actions/cache@v4
+        name: Cache node_modules
+        id: cache-node-modules
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        with:
+          path: |
+            node_modules
+            example/node_modules
+          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
+          fail-on-cache-miss: true
 
-    - name: Cache Pods
-      id: cache-pods
-      uses: actions/cache@v3
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      with:
-        path: example/ios/Pods
-        key: ${{ runner.os }}-pods-${{ matrix.cocoapods }}-${{ hashFiles('**/Podfile.lock') }}
+      - name: Cache Pods
+        id: cache-pods
+        uses: actions/cache@v4
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        with:
+          path: example/ios/Pods
+          key: ${{ runner.os }}-pods-${{ matrix.cocoapods }}-new-arch-${{ matrix.new-arch }}-${{ hashFiles('**/Podfile.lock') }}
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      with:
-        ruby-version: 2.7
-        bundler-cache: true
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        with:
+          ruby-version: 2.7
+          bundler-cache: true
 
-    - name: Install Cocoapods
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      run: gem install cocoapods -v ${{ matrix.cocoapods }}
+      - name: Install Cocoapods
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        run: gem install cocoapods -v ${{ matrix.cocoapods }}
 
-    - name: Setup node
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      - name: Setup node
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-    - name: Install Pods
-      if: steps.cache-pods.outputs.cache-hit != 'true' && steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      run: |
-        cd example/ios
-        pod cache clean --all
-        pod install
+      - name: Install Pods
+        if: steps.cache-pods.outputs.cache-hit != 'true' && steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        run: |
+          cd example/ios
+          pod cache clean --all
+          RCT_NEW_ARCH_ENABLED=${{ matrix.new-arch }} pod install
 
-    - name: Install xcpretty
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      run: gem install xcpretty
+      - name: Install xcpretty
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        run: gem install xcpretty
 
-    - name: Build
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      run: |
-        cd example/ios
-        xcodebuild -workspace ImageMarkerExample.xcworkspace -scheme ImageMarkerExample -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 12' | xcpretty
+      - name: Build
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        run: |
+          cd example/ios
+          xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' | xcpretty
 
-    - name: Test
-      if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
-      run: |
-        cd example/ios
-        xcodebuild -workspace ImageMarkerExample.xcworkspace -scheme ImageMarkerExample -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 12' test | xcpretty
+      - name: Test
+        if: steps.verify-iOS-changed-files.outputs.any_changed == 'true'
+        run: |
+          cd example/ios
+          xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15' test | xcpretty
+
+  web-test:
+    runs-on: macos-latest
+    needs: install-dep
+    name: Web WASM and Browser Test
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: Verify Web Changed files
+        uses: tj-actions/changed-files@v46
+        id: verify-web-changed-files
+        with:
+          files: |
+            cpp/**
+            src/**
+            web/**
+            scripts/build-web-wasm.sh
+            scripts/test-web.mjs
+            scripts/test-web-browser.mjs
+            scripts/test-web-metro.mjs
+            scripts/web-metro-entry.js
+            scripts/web-test.html
+            package.json
+            yarn.lock
+
+      - uses: actions/cache@v4
+        name: Cache node_modules
+        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+        with:
+          path: |
+            node_modules
+            example/node_modules
+          fail-on-cache-miss: true
+          key: ${{ runner.os }}-nodeModules-${{ hashFiles('package.json') }}-${{ hashFiles('example/package.json') }}
+
+      - name: Setup node
+        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build package
+        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+        run: yarn prepare
+
+      - name: Run Web tests
+        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+        run: |
+          yarn test:web
+          yarn test:web:browser
+          yarn test:web:metro
+
+      - name: Verify npm package contents
+        if: steps.verify-web-changed-files.outputs.any_changed == 'true'
+        run: npm pack --dry-run --ignore-scripts
 
   ci-complete:
     name: Complete CI
-    needs: [android-build, android-api-level-test, ios-build-test]
+    needs: [android-build, android-api-level-test, ios-build-test, web-test]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

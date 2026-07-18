@@ -1,12 +1,12 @@
 package com.jimmydaddy.bsdiffpatch
 
-import com.facebook.react.TurboReactPackage
+import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 
-class BsDiffPatchPackage : TurboReactPackage() {
+class BsDiffPatchPackage : BaseReactPackage() {
   override fun getModule(
     name: String,
     reactContext: ReactApplicationContext
@@ -24,7 +24,6 @@ class BsDiffPatchPackage : TurboReactPackage() {
         BsDiffPatchNative.NAME to ReactModuleInfo(
           BsDiffPatchNative.NAME,
           BsDiffPatchModule::class.java.name,
-          false,
           false,
           false,
           false,
