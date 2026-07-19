@@ -40,9 +40,11 @@ iOS autolinking registers `BsDiffPatch` for both architectures. New
 Architecture codegen maps the module through `modulesProvider`, and the module
 returns a generated TurboModule instance when `RCT_NEW_ARCH_ENABLED` is set.
 
-Module methods use a concurrent dispatch queue so cancellation can be delivered
-while work is active; actual patch work is serialized by a library semaphore.
-The job registry is cancelled and cleaned when the module is invalidated.
+Module methods use a serial dispatch queue so a job is registered before a
+following cancellation request is handled. Patch work runs asynchronously on a
+separate serial worker queue, keeping the bridge responsive while preserving the
+shared C library's single-operation boundary. The job registry is cancelled and
+cleaned when the module is invalidated.
 
 ## React Native Web
 

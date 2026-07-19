@@ -29,14 +29,16 @@ struct OperationState {
 std::mutex operationsMutex;
 std::unordered_map<std::string, std::shared_ptr<OperationState>> operations;
 
-dispatch_semaphore_t operationSemaphore()
+dispatch_queue_t operationQueue()
 {
-    static dispatch_semaphore_t semaphore;
+    static dispatch_queue_t queue;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        semaphore = dispatch_semaphore_create(1);
+        queue = dispatch_queue_create(
+            "com.jimmydaddy.bsdiffpatch.worker",
+            DISPATCH_QUEUE_SERIAL);
     });
-    return semaphore;
+    return queue;
 }
 
 std::string operationKey(NSString *jobId)
@@ -137,7 +139,7 @@ RCT_EXPORT_MODULE()
     dispatch_once(&onceToken, ^{
         queue = dispatch_queue_create(
             "com.jimmydaddy.bsdiffpatch.module",
-            DISPATCH_QUEUE_CONCURRENT);
+            DISPATCH_QUEUE_SERIAL);
     });
     return queue;
 }
@@ -312,41 +314,41 @@ RCT_EXPORT_MODULE()
         return;
     }
 
-    dispatch_semaphore_wait(operationSemaphore(), DISPATCH_TIME_FOREVER);
-    int result;
-    if (state->cancelled.load(std::memory_order_relaxed)) {
-        result = BS_OPERATION_CANCELLED;
-    } else {
-        bs_operation_options options{};
-        options.max_input_bytes = (int64_t)maxInputBytes;
-        options.max_output_bytes = (int64_t)maxOutputBytes;
-        options.opaque = state.get();
-        options.is_cancelled = isCancelled;
-        options.progress = emitProgress;
-        result = [operation isEqualToString:@"patch"]
-            ? bsdiffpatch::patchFileWithOptions(
-                  [oldFile UTF8String],
-                  [newFile UTF8String],
-                  [patchFile UTF8String],
-                  &options)
-            : bsdiffpatch::diffFileWithOptions(
-                  [oldFile UTF8String],
-                  [newFile UTF8String],
-                  [patchFile UTF8String],
-                  &options);
-    }
-    dispatch_semaphore_signal(operationSemaphore());
-    removeOperation(jobId);
+    dispatch_async(operationQueue(), ^{
+        int result;
+        if (state->cancelled.load(std::memory_order_relaxed)) {
+            result = BS_OPERATION_CANCELLED;
+        } else {
+            bs_operation_options options{};
+            options.max_input_bytes = (int64_t)maxInputBytes;
+            options.max_output_bytes = (int64_t)maxOutputBytes;
+            options.opaque = state.get();
+            options.is_cancelled = isCancelled;
+            options.progress = emitProgress;
+            result = [operation isEqualToString:@"patch"]
+                ? bsdiffpatch::patchFileWithOptions(
+                      [oldFile UTF8String],
+                      [newFile UTF8String],
+                      [patchFile UTF8String],
+                      &options)
+                : bsdiffpatch::diffFileWithOptions(
+                      [oldFile UTF8String],
+                      [newFile UTF8String],
+                      [patchFile UTF8String],
+                      &options);
+        }
+        removeOperation(jobId);
 
-    if (result == BS_OPERATION_OK) {
-        resolve(@(result));
-    } else {
-        [self rejectOperation:operation
-                       result:result
-                maxInputBytes:(int64_t)maxInputBytes
-               maxOutputBytes:(int64_t)maxOutputBytes
-                       reject:reject];
-    }
+        if (result == BS_OPERATION_OK) {
+            resolve(@(result));
+        } else {
+            [self rejectOperation:operation
+                           result:result
+                    maxInputBytes:(int64_t)maxInputBytes
+                   maxOutputBytes:(int64_t)maxOutputBytes
+                           reject:reject];
+        }
+    });
 }
 
 RCT_EXPORT_METHOD(patch:(NSString *)oldFile
@@ -365,12 +367,12 @@ RCT_EXPORT_METHOD(patch:(NSString *)oldFile
                                 patchFile:patchFile
                                    reject:reject]) return;
 
-    dispatch_semaphore_wait(operationSemaphore(), DISPATCH_TIME_FOREVER);
-    int result = bsdiffpatch::patchFile(
-        [oldFile UTF8String], [newFile UTF8String], [patchFile UTF8String]);
-    dispatch_semaphore_signal(operationSemaphore());
-    if (result == 0) resolve(@(result));
-    else reject(@"EPATCH", [NSString stringWithFormat:@"patch failed with native result %d", result], nil);
+    dispatch_async(operationQueue(), ^{
+        int result = bsdiffpatch::patchFile(
+            [oldFile UTF8String], [newFile UTF8String], [patchFile UTF8String]);
+        if (result == 0) resolve(@(result));
+        else reject(@"EPATCH", [NSString stringWithFormat:@"patch failed with native result %d", result], nil);
+    });
 }
 
 RCT_EXPORT_METHOD(diff:(NSString *)oldFile
@@ -389,12 +391,12 @@ RCT_EXPORT_METHOD(diff:(NSString *)oldFile
                                 patchFile:patchFile
                                    reject:reject]) return;
 
-    dispatch_semaphore_wait(operationSemaphore(), DISPATCH_TIME_FOREVER);
-    int result = bsdiffpatch::diffFile(
-        [oldFile UTF8String], [newFile UTF8String], [patchFile UTF8String]);
-    dispatch_semaphore_signal(operationSemaphore());
-    if (result == 0) resolve(@(result));
-    else reject(@"EDIFF", [NSString stringWithFormat:@"diff failed with native result %d", result], nil);
+    dispatch_async(operationQueue(), ^{
+        int result = bsdiffpatch::diffFile(
+            [oldFile UTF8String], [newFile UTF8String], [patchFile UTF8String]);
+        if (result == 0) resolve(@(result));
+        else reject(@"EDIFF", [NSString stringWithFormat:@"diff failed with native result %d", result], nil);
+    });
 }
 
 RCT_EXPORT_METHOD(startPatch:(NSString *)jobId
