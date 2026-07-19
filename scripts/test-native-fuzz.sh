@@ -14,6 +14,7 @@ trap cleanup EXIT INT TERM
 
 if "$compiler" \
   -std=c11 \
+  -D_POSIX_C_SOURCE=200809L \
   -g \
   -O1 \
   -fno-omit-frame-pointer \
@@ -36,6 +37,7 @@ if "$compiler" \
 else
   "$compiler" \
     -std=c11 \
+    -D_POSIX_C_SOURCE=200809L \
     -g \
     -O1 \
     -fno-omit-frame-pointer \

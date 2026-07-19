@@ -37,6 +37,14 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 
+function parseTrailingJson(output) {
+  const start = output.startsWith('[') ? 0 : output.lastIndexOf('\n[') + 1;
+  if (start < 0 || output[start] !== '[') {
+    throw new Error(`JSON array not found in command output:\n${output}`);
+  }
+  return JSON.parse(output.slice(start));
+}
+
 async function pathExists(candidate) {
   try {
     await access(candidate);
@@ -47,7 +55,7 @@ async function pathExists(candidate) {
 }
 
 try {
-  const packOutput = JSON.parse(
+  const packOutput = parseTrailingJson(
     run('npm', [
       'pack',
       '--ignore-scripts',
