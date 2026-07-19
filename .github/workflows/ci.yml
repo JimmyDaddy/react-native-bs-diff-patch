@@ -239,6 +239,10 @@ jobs:
           cache-provider: basic
           cache-read-only: true
 
+      - name: Prewarm Gradle wrapper
+        working-directory: example/android
+        run: ./gradlew --version
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
