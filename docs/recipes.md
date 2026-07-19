@@ -75,6 +75,7 @@ the input or output size. Before starting an operation:
 - reject input larger than the product's tested limit;
 - confirm sufficient local storage for native temporary outputs;
 - prevent unbounded simultaneous calls from user actions;
+- use `startDiff`/`startPatch` to enforce native byte limits and expose Cancel;
 - pass an `AbortSignal` to Web operations when cancellation is appropriate;
 - move very large update generation to controlled backend infrastructure.
 
@@ -101,6 +102,32 @@ try {
     return;
   }
   throw error;
+}
+```
+
+The equivalent native control flow uses a job:
+
+```ts
+const job = startPatch(oldPath, outputPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+const unsubscribe = job.onProgress(renderProgress);
+
+try {
+  await job.result;
+} catch (error) {
+  if (isPatchError(error) && error.code === 'ECANCELLED') return;
+  if (
+    isPatchError(error) &&
+    ['EINPUT_TOO_LARGE', 'EOUTPUT_TOO_LARGE'].includes(error.code || '')
+  ) {
+    // Show the native size-limit guidance.
+    return;
+  }
+  throw error;
+} finally {
+  unsubscribe();
 }
 ```
 

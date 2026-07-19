@@ -19,11 +19,8 @@ target 'BsDiffPatchExample' do
 
   use_react_native!(
     :path => config[:reactNativePath],
-    # Flipper is unnecessary in CI and is incompatible with current Xcode releases.
-    :flipper_configuration => FlipperConfiguration.disabled,
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/..",
-    :hermes_enabled => false
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
   target 'BsDiffPatchExampleTests' do

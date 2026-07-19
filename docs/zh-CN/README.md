@@ -23,7 +23,7 @@
 - [生产实践](/docs/zh-CN/recipes/) — 完整性、清理、下载与跨运行时流程。
 - [平台支持](/docs/zh-CN/platform-support/) — 架构与打包器行为。
 - [架构](/docs/zh-CN/architecture/) — 执行路径与补丁兼容性。
-- [0.3 原生操作](/docs/zh-CN/native-operations-v03/) — 资源限制、取消、进度与
+- [可控制的原生操作](/docs/zh-CN/native-operations-v03/) — 资源限制、取消、进度与
   原子输出约定。
 - [常见问题与排障](/docs/zh-CN/troubleshooting/) — 常见集成失败。
 - [开发与验证](/docs/zh-CN/development/) — 本地构建、测试、WASM 与发布检查。

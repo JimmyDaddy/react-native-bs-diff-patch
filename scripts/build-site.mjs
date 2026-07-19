@@ -46,9 +46,9 @@ const pages = [
   },
   {
     slug: 'native-operations-v03',
-    title: 'Native operations 0.3',
+    title: 'Controllable native operations',
     description:
-      'Planned resource limits, cancellation, progress, and atomic output contract.',
+      'Native resource limits, cancellation, progress, and atomic output behavior.',
     file: 'native-operations-v03.md',
   },
   {
@@ -100,8 +100,8 @@ const chinesePages = [
   },
   {
     slug: 'native-operations-v03',
-    title: '0.3 原生操作',
-    description: '规划中的资源限制、取消、进度与原子输出约定。',
+    title: '可控制的原生操作',
+    description: '原生资源限制、取消、进度与原子输出行为。',
     file: 'native-operations-v03.md',
   },
   {
@@ -128,7 +128,7 @@ function escapeHtml(value) {
 }
 
 function normalizeDocumentationLink(href) {
-  const markdownMatch = href.match(/^\.\/([a-z-]+)\.md(#[\w-]+)?$/);
+  const markdownMatch = href.match(/^\.\/([a-z0-9-]+)\.md(#[\w-]+)?$/);
   if (markdownMatch) {
     return `/docs/${markdownMatch[1]}/${markdownMatch[2] || ''}`;
   }

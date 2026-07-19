@@ -7,6 +7,8 @@ path. Native runtimes use absolute paths; Web uses in-memory binary values.
 import {
   diff,
   patch,
+  startDiff,
+  startPatch,
   diffBytes,
   patchBytes,
   type BinaryInput,
@@ -51,6 +53,54 @@ Reconstructs the target file at `outputFile`. Available on Android and iOS.
 - `patchFile`: existing compatible patch path.
 - Resolves to `0` on success.
 - Rejects rather than overwriting an existing `outputFile`.
+
+## `startDiff` and `startPatch`
+
+```ts
+interface NativeOperationOptions {
+  maxInputBytes?: number;
+  maxOutputBytes?: number;
+}
+
+interface NativeOperationProgress {
+  id: string;
+  operation: 'diff' | 'patch';
+  phase: 'reading' | 'processing' | 'writing';
+  progress: number;
+}
+
+interface NativeOperationJob {
+  id: string;
+  result: Promise<number>;
+  cancel(): Promise<void>;
+  onProgress(listener: (event: NativeOperationProgress) => void): () => void;
+}
+
+function startDiff(
+  oldFile: string,
+  newFile: string,
+  patchFile: string,
+  options?: NativeOperationOptions
+): NativeOperationJob;
+
+function startPatch(
+  oldFile: string,
+  outputFile: string,
+  patchFile: string,
+  options?: NativeOperationOptions
+): NativeOperationJob;
+```
+
+The job API is available on Android and iOS when progress, cancellation, or
+resource bounds are required.
+
+- `result` resolves to `0` or rejects with a classified native error.
+- `cancel()` requests cooperative cancellation; a cancelled result rejects
+  with `ECANCELLED`.
+- `onProgress()` filters events to this job and returns an unsubscribe function.
+- Native limits must be positive safe integers when supplied.
+- Failed job operations remove their sibling temporary output and never
+  overwrite an existing destination.
 
 ## `diffBytes`
 
@@ -108,13 +158,14 @@ bytes. Available on Web.
 
 The binary APIs accept the options argument on native only to keep shared
 wrappers source-compatible, then reject with `EUNSUPPORTED` as usual. Native
-resource policy remains the application's filesystem/workflow responsibility.
+path operations use `startDiff` or `startPatch` for equivalent controls.
 
 ## Availability behavior
 
-All four functions remain exported so shared code has one stable import shape.
+All functions remain exported so shared code has one stable import shape.
 Calling `diffBytes` or `patchBytes` on native rejects with `EUNSUPPORTED`.
-Calling `diff` or `patch` on Web behaves the same way.
+Calling `diff`, `patch`, `startDiff`, or `startPatch` on Web behaves the same
+way.
 
 Importing the Web entry during server-side rendering does not start a Worker.
 Calling a binary API without browser Worker support rejects with
@@ -136,6 +187,9 @@ type PatchError = Error & { code?: string };
 | `EEXIST`       | A native output path already exists.                        |
 | `EUNSUPPORTED` | The selected API is not available on the current platform.  |
 | `EUNAVAILABLE` | The native module worker has already shut down.             |
+| `ECANCELLED`   | A native job was cooperatively cancelled.                   |
+| `EINPUT_TOO_LARGE` | A native input exceeded `maxInputBytes`.               |
+| `EOUTPUT_TOO_LARGE` | Native generated/restored output exceeded its limit.  |
 | `EABORTED`     | The Web operation was cancelled through its signal.         |
 | `ERESOURCE`    | A configured Web input or output byte limit was exceeded.   |
 | `EDIFF`        | The native diff core rejected or could not write the input. |
@@ -152,7 +206,9 @@ Worker startup, patch validation, or WebAssembly execution use
 
 ## Concurrency and ordering
 
-Each native platform uses a serial library-owned queue. Web calls without a
+Each native platform uses a serial library-owned queue shared by promise and
+job operations. Cancelling a queued job prevents it from entering the C core;
+cancelling an active job is observed cooperatively. Web calls without a
 signal share one module Worker, a serialized request queue, and a cached
 WebAssembly module. Calls with a signal use a dedicated Worker so cancellation
 is operation-local. Apply an application-level concurrency and memory budget
@@ -160,5 +216,5 @@ for large browser inputs.
 
 ## Patch format
 
-All four operations read or write `ENDSLEY/BSDIFF43` patches. Other bsdiff
+All operations read or write `ENDSLEY/BSDIFF43` patches. Other bsdiff
 variants, such as patches beginning with `BSDIFF40`, are not interchangeable.

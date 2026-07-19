@@ -2,12 +2,21 @@
 
 set -eu
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <react-native-version>" >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  echo "Usage: $0 <react-native-version> [new|old]" >&2
   exit 2
 fi
 
 react_native_version="$1"
+architecture="${2:-new}"
+case "$architecture" in
+  new) new_arch_enabled=1 ;;
+  old) new_arch_enabled=0 ;;
+  *)
+    echo "Unsupported iOS architecture fixture: $architecture" >&2
+    exit 2
+    ;;
+esac
 repository_directory=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 temporary_directory=$(mktemp -d)
 consumer_directory="$temporary_directory/consumer"
@@ -73,7 +82,7 @@ npm install \
 
 (
   cd "$consumer_directory/ios"
-  RCT_NEW_ARCH_ENABLED=1 \
+  RCT_NEW_ARCH_ENABLED="$new_arch_enabled" \
     BUNDLE_GEMFILE="$repository_directory/example/Gemfile" \
     bundle exec pod install
 

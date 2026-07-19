@@ -7,6 +7,8 @@
 import {
   diff,
   patch,
+  startDiff,
+  startPatch,
   diffBytes,
   patchBytes,
   type BinaryInput,
@@ -48,6 +50,51 @@ function patch(
   参数位置与行为才是公开约定。
 - `patchFile`：已存在且兼容的补丁路径。
 - 成功时返回 `0`，不会覆盖已有输出文件。
+
+## `startDiff` 与 `startPatch`
+
+```ts
+interface NativeOperationOptions {
+  maxInputBytes?: number;
+  maxOutputBytes?: number;
+}
+
+interface NativeOperationProgress {
+  id: string;
+  operation: 'diff' | 'patch';
+  phase: 'reading' | 'processing' | 'writing';
+  progress: number;
+}
+
+interface NativeOperationJob {
+  id: string;
+  result: Promise<number>;
+  cancel(): Promise<void>;
+  onProgress(listener: (event: NativeOperationProgress) => void): () => void;
+}
+
+function startDiff(
+  oldFile: string,
+  newFile: string,
+  patchFile: string,
+  options?: NativeOperationOptions
+): NativeOperationJob;
+
+function startPatch(
+  oldFile: string,
+  outputFile: string,
+  patchFile: string,
+  options?: NativeOperationOptions
+): NativeOperationJob;
+```
+
+Android、iOS 需要进度、取消或资源边界时使用 job API。
+
+- `result` 成功时返回 `0`，失败时按原生错误码拒绝。
+- `cancel()` 请求协作式取消；取消后的结果以 `ECANCELLED` 拒绝。
+- `onProgress()` 只转发当前 job 的事件，并返回取消订阅函数。
+- 原生限制在传入时必须是正安全整数。
+- job 失败会清理同目录临时输出，且不会覆盖已有目标文件。
 
 ## `diffBytes`
 
@@ -102,12 +149,13 @@ function patchBytes(
   拒绝。
 
 原生端的二进制 API 接受 options 参数只是为了让共享封装保持源码兼容，随后仍会以
-`EUNSUPPORTED` 拒绝。原生资源策略由应用的文件系统与外围流程负责。
+`EUNSUPPORTED` 拒绝。原生路径操作通过 `startDiff`、`startPatch` 获得同类控制。
 
 ## 平台不可用时的行为
 
-四个函数始终导出，以便共享代码保持稳定导入形式。在原生端调用 `diffBytes` 或
-`patchBytes`、在 Web 调用 `diff` 或 `patch`，都会以 `EUNSUPPORTED` 拒绝。
+所有函数始终导出，以便共享代码保持稳定导入形式。在原生端调用 `diffBytes` 或
+`patchBytes`，以及在 Web 调用 `diff`、`patch`、`startDiff` 或 `startPatch`，
+都会以 `EUNSUPPORTED` 拒绝。
 
 SSR 阶段导入 Web 入口不会启动 Worker；在没有浏览器 Worker 的环境调用二进制
 API 会以 `EUNSUPPORTED` 拒绝。
@@ -127,6 +175,9 @@ type PatchError = Error & { code?: string };
 | `EEXIST`       | 原生端输出路径已经存在。                  |
 | `EUNSUPPORTED` | 当前平台不支持所选 API。                  |
 | `EUNAVAILABLE` | 原生模块工作队列已经关闭。                |
+| `ECANCELLED`   | 原生 job 被协作式取消。                   |
+| `EINPUT_TOO_LARGE` | 原生输入超过 `maxInputBytes`。       |
+| `EOUTPUT_TOO_LARGE` | 原生生成或还原输出超过配置上限。     |
 | `EABORTED`     | Web 操作被传入的 signal 取消。            |
 | `ERESOURCE`    | 超过配置的 Web 输入或输出字节上限。       |
 | `EDIFF`        | 原生 diff 核心拒绝输入或无法写入补丁。    |
@@ -138,11 +189,12 @@ type PatchError = Error & { code?: string };
 
 ## 并发与顺序
 
-每个原生平台使用库内部的串行队列。不带 signal 的 Web 调用共用一个模块 Worker、
+每个原生平台的 Promise 与 job 操作共用库内部串行队列。取消排队任务会阻止它进入
+C 核心；运行中的任务会协作式观察取消。不带 signal 的 Web 调用共用一个模块 Worker、
 串行请求队列和已缓存的 WebAssembly 模块；带 signal 的调用使用专用 Worker，确保
 取消仅影响当前操作。对大输入仍应设置应用级并发和内存预算。
 
 ## 补丁格式
 
-四个操作都读写 `ENDSLEY/BSDIFF43` 补丁。以 `BSDIFF40` 开头的其他 bsdiff
+所有操作都读写 `ENDSLEY/BSDIFF43` 补丁。以 `BSDIFF40` 开头的其他 bsdiff
 变体不能互换。

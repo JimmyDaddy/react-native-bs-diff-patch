@@ -4,12 +4,13 @@
 
 #ifdef RCT_NEW_ARCH_ENABLED
 #import "RNBsDiffPatchSpec.h"
+#import <React/RCTEventEmitter.h>
 
-@interface BsDiffPatch : NSObject <NativeBsDiffPatchSpec>
+@interface BsDiffPatch : RCTEventEmitter <NativeBsDiffPatchSpec>
 #else
-#import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
 
-@interface BsDiffPatch : NSObject <RCTBridgeModule>
+@interface BsDiffPatch : RCTEventEmitter <RCTBridgeModule>
 #endif
 
 @end

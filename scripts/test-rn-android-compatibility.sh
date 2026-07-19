@@ -18,7 +18,13 @@ else
   kotlin_version=1.9.22
 fi
 
-"$repository_directory/example/android/gradlew" \
+gradle_executable="${GRADLE_EXECUTABLE:-gradle}"
+if ! command -v "$gradle_executable" >/dev/null 2>&1; then
+  echo "Gradle 8.3 is required; set GRADLE_EXECUTABLE or install Gradle 8.3" >&2
+  exit 1
+fi
+
+"$gradle_executable" \
   -p "$repository_directory/compatibility/android-api" \
   --no-daemon \
   --stacktrace \

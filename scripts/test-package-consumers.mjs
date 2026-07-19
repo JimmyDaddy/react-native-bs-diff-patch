@@ -167,11 +167,11 @@ try {
     'const moduleValue = { diff: async () => 0, patch: async () => 0 };\n';
   await writeFile(
     path.join(fakeReactNativeDirectory, 'index.mjs'),
-    `${fakeRegistry}export const TurboModuleRegistry = { getEnforcing: () => moduleValue };\n`
+    `${fakeRegistry}export class NativeEventEmitter { addListener() { return { remove() {} }; } }\nexport const TurboModuleRegistry = { getEnforcing: () => moduleValue };\n`
   );
   await writeFile(
     path.join(fakeReactNativeDirectory, 'index.cjs'),
-    `${fakeRegistry}exports.TurboModuleRegistry = { getEnforcing: () => moduleValue };\n`
+    `${fakeRegistry}exports.NativeEventEmitter = class NativeEventEmitter { addListener() { return { remove() {} }; } };\nexports.TurboModuleRegistry = { getEnforcing: () => moduleValue };\n`
   );
 
   const installedPackageDirectory = path.join(

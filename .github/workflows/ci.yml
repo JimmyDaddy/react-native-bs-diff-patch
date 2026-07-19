@@ -159,15 +159,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   android-build:
-    name: Android Build (newArch=${{ matrix.new-arch }})
+    name: Android New Architecture Build
     needs: changes
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: true
-      matrix:
-        new-arch: [false, true]
     steps:
       - name: Checkout the code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -193,14 +189,14 @@ jobs:
       - name: Build Android and run unit tests
         working-directory: example/android
         run: |
-          ./gradlew test assembleRelease --stacktrace -PnewArchEnabled=${{ matrix.new-arch }}
-          mv app/build/outputs/apk/release/app-release.apk app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
+          ./gradlew test assembleRelease --stacktrace -PnewArchEnabled=true
+          mv app/build/outputs/apk/release/app-release.apk app-release-${{ github.sha }}-new-arch.apk
 
       - name: Upload Android reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: Android-Build-Reports-new-arch-${{ matrix.new-arch }}
+          name: Android-New-Architecture-Build-Reports
           path: example/android/**/build/reports
           if-no-files-found: ignore
           retention-days: 7
@@ -208,8 +204,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}
-          path: example/android/app-release-${{ github.sha }}-new-arch-${{ matrix.new-arch }}.apk
+          name: app-release-${{ github.sha }}-new-arch
+          path: example/android/app-release-${{ github.sha }}-new-arch.apk
           if-no-files-found: error
           retention-days: 7
 
@@ -223,7 +219,7 @@ jobs:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       max-parallel: 2
       matrix:
-        api-level: ${{ fromJSON(github.event_name == 'pull_request' && '[31]' || '[24,25,29,30,31]') }}
+        api-level: ${{ fromJSON(github.event_name == 'pull_request' && '[24,31]' || '[24,25,29,30,31]') }}
     steps:
       - name: Checkout the code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -274,7 +270,7 @@ jobs:
           retention-days: 7
 
   android-rn-compatibility:
-    name: Android RN API Compatibility (${{ matrix.react-native }})
+    name: Android RN API Compatibility (${{ matrix.react-native }}, ${{ matrix.architecture }})
     needs: changes
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
@@ -283,7 +279,13 @@ jobs:
       fail-fast: true
       max-parallel: 2
       matrix:
-        react-native: ['0.73.11', '0.74.7', '0.86.0']
+        include:
+          - react-native: '0.73.11'
+            architecture: old
+          - react-native: '0.73.11'
+            architecture: new
+          - react-native: '0.74.7'
+            architecture: new
     steps:
       - name: Checkout the code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -297,23 +299,19 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
         with:
+          gradle-version: '8.3'
           cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Compile library against React Native Android APIs
-        run: sh scripts/test-rn-android-compatibility.sh ${{ matrix.react-native }} new
+        run: sh scripts/test-rn-android-compatibility.sh ${{ matrix.react-native }} ${{ matrix.architecture }}
 
   ios-build-test:
-    name: iOS (newArch=${{ matrix.new-arch }})
+    name: iOS New Architecture Runtime Test
     needs: changes
     if: needs.changes.outputs.ios == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
-    strategy:
-      fail-fast: ${{ github.event_name == 'pull_request' }}
-      max-parallel: 2
-      matrix:
-        new-arch: ['0', '1']
     steps:
       - name: Checkout the code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -334,14 +332,14 @@ jobs:
           path: |
             example/ios/Pods
             ~/Library/Caches/CocoaPods
-          key: ${{ runner.os }}-pods-no-flipper-new-arch-${{ matrix.new-arch }}-${{ hashFiles('example/ios/Podfile.lock', 'example/Gemfile.lock') }}
+          key: ${{ runner.os }}-pods-rn86-new-arch-${{ hashFiles('example/ios/Podfile.lock', 'example/Gemfile.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pods-no-flipper-new-arch-${{ matrix.new-arch }}-
+            ${{ runner.os }}-pods-rn86-new-arch-
 
       - name: Install Pods
         env:
           NO_FLIPPER: '1'
-          RCT_NEW_ARCH_ENABLED: ${{ matrix.new-arch }}
+          RCT_NEW_ARCH_ENABLED: '1'
         run: |
           cd example/ios
           bundle exec pod install
@@ -362,6 +360,8 @@ jobs:
         run: |
           set -o pipefail
           cd example/ios
+          # Xcode expands $(inherited), not the shell.
+          # shellcheck disable=SC2016
           xcodebuild \
             -workspace BsDiffPatchExample.xcworkspace \
             -scheme BsDiffPatchExample \
@@ -369,7 +369,7 @@ jobs:
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" \
-            EXPECTED_NEW_ARCH=${{ matrix.new-arch }} \
+            EXPECTED_NEW_ARCH=1 \
             GCC_PREPROCESSOR_DEFINITIONS='$(inherited) EXPECTED_NEW_ARCH=$(EXPECTED_NEW_ARCH)' \
             test | bundle exec xcpretty
 
@@ -377,13 +377,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: iOS-Test-Results-new-arch-${{ matrix.new-arch }}
+          name: iOS-New-Architecture-Test-Results
           path: ${{ runner.temp }}/ios-tests.xcresult
           if-no-files-found: ignore
           retention-days: 7
 
   ios-rn-compatibility:
-    name: iOS RN API Compatibility (${{ matrix.react-native }})
+    name: iOS RN API Compatibility (${{ matrix.react-native }}, ${{ matrix.architecture }})
     needs: changes
     if: needs.changes.outputs.ios == 'true'
     runs-on: ${{ matrix.runner }}
@@ -394,20 +394,23 @@ jobs:
       matrix:
         include:
           - react-native: '0.73.11'
+            architecture: old
+            node: '18'
+            runner: macos-14
+          - react-native: '0.73.11'
+            architecture: new
             node: '18'
             runner: macos-14
           - react-native: '0.74.7'
+            architecture: new
             node: '18'
             runner: macos-14
-          - react-native: '0.86.0'
-            node: '22'
-            runner: macos-15
     steps:
       - name: Checkout the code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: ${{ matrix.node }}
 
@@ -419,7 +422,7 @@ jobs:
           working-directory: example
 
       - name: Compile Pod against React Native iOS APIs
-        run: sh scripts/test-rn-ios-compatibility.sh ${{ matrix.react-native }}
+        run: sh scripts/test-rn-ios-compatibility.sh ${{ matrix.react-native }} ${{ matrix.architecture }}
 
   web-test:
     name: Web WASM and Browser Test
@@ -468,6 +471,7 @@ jobs:
           yarn typecheck
           yarn lint
           yarn test --runInBand
+          yarn test:native-operations
           FUZZ_RUNS=2000 yarn test:fuzz
 
   site-test:

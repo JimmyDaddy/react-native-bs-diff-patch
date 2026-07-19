@@ -14,12 +14,13 @@ const bundleBase = path.join(
 const bundlePath = `${bundleBase}.js`;
 const metroPath = path.join(
   repositoryDirectory,
-  'example/node_modules/.bin/metro'
+  'example/node_modules/metro/src/cli.js'
 );
 
 const result = spawnSync(
-  metroPath,
+  process.execPath,
   [
+    metroPath,
     'build',
     '../scripts/web-metro-entry.js',
     '--platform',
@@ -39,7 +40,9 @@ const result = spawnSync(
 
 if (result.status !== 0) {
   throw new Error(
-    `Metro Web build failed:\n${result.stdout || ''}\n${result.stderr || ''}`
+    `Metro Web build failed:\n${result.error || ''}\n${
+      result.stdout || ''
+    }\n${result.stderr || ''}`
   );
 }
 

@@ -66,6 +66,7 @@ try {
 - 拒绝超过产品验证上限的输入；
 - 确认原生端临时输出所需的本地空间；
 - 防止用户操作触发无限并发；
+- 使用 `startDiff`/`startPatch` 限制原生字节数并提供取消入口；
 - Web 操作需要取消时传入 `AbortSignal`；
 - 将超大更新的生成工作放到受控后端基础设施。
 
@@ -91,6 +92,32 @@ try {
     return;
   }
   throw error;
+}
+```
+
+原生端对应流程使用 job：
+
+```ts
+const job = startPatch(oldPath, outputPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+const unsubscribe = job.onProgress(renderProgress);
+
+try {
+  await job.result;
+} catch (error) {
+  if (isPatchError(error) && error.code === 'ECANCELLED') return;
+  if (
+    isPatchError(error) &&
+    ['EINPUT_TOO_LARGE', 'EOUTPUT_TOO_LARGE'].includes(error.code || '')
+  ) {
+    // 展示原生端大小限制说明。
+    return;
+  }
+  throw error;
+} finally {
+  unsubscribe();
 }
 ```
 

@@ -33,6 +33,7 @@ class NewArchitectureRuntimeTest {
     while (SystemClock.uptimeMillis() < deadline) {
       try {
         onView(withText("Runtime: success")).check(matches(isDisplayed()))
+        onView(withText("Controls: success")).check(matches(isDisplayed()))
         return
       } catch (error: NoMatchingViewException) {
         lastFailure = error
@@ -44,7 +45,7 @@ class NewArchitectureRuntimeTest {
     }
 
     throw AssertionError(
-      "The React Native diff/patch round trip did not complete successfully",
+      "The React Native round trip and native operation controls did not complete successfully",
       lastFailure
     )
   }
