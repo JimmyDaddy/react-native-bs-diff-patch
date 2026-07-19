@@ -61,13 +61,26 @@ jobs:
                   site=true
                   web=true
                   ;;
-                src/**|cpp/**|assets/**)
+                src/**|assets/**)
+                  android=true
+                  ios=true
+                  quality=true
+                  web=true
+                  ;;
+                cpp/fuzz/**|scripts/test-native-fuzz.sh)
+                  quality=true
+                  ;;
+                cpp/**)
                   android=true
                   ios=true
                   quality=true
                   web=true
                   ;;
                 android/**|example/android/**|scripts/run-android-runtime-test.sh)
+                  android=true
+                  quality=true
+                  ;;
+                compatibility/android-api/**|scripts/test-rn-android-compatibility.sh)
                   android=true
                   quality=true
                   ;;
@@ -80,13 +93,27 @@ jobs:
                   ios=true
                   quality=true
                   ;;
-                web/**|scripts/build-web-wasm.sh|scripts/test-web*.mjs|scripts/web-*)
+                web/**|fixtures/**|scripts/build-web-wasm.sh|scripts/test-web*.mjs|scripts/web-*)
+                  android=true
+                  ios=true
                   web=true
                   quality=true
                   site=true
                   ;;
+                scripts/prepare-package.mjs|scripts/test-package-consumers.mjs)
+                  quality=true
+                  web=true
+                  ;;
+                benchmarks/**|scripts/benchmark-web.mjs)
+                  quality=true
+                  site=true
+                  web=true
+                  ;;
                 site/**|docs/**|README*.md|CONTRIBUTING.md|scripts/build-site.mjs|scripts/test-site*.mjs|.github/workflows/pages.yml)
                   site=true
+                  ;;
+                .github/ISSUE_TEMPLATE/**|.github/PULL_REQUEST_TEMPLATE.md|.github/CODEOWNERS|.github/dependabot.yml)
+                  quality=true
                   ;;
                 *.md)
                   site=true
@@ -238,6 +265,36 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  android-rn-compatibility:
+    name: Android RN API Compatibility (${{ matrix.react-native }})
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      max-parallel: 2
+      matrix:
+        react-native: ['0.73.11', '0.74.7', '0.86.0']
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+        with:
+          cache-provider: basic
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Compile library against React Native Android APIs
+        run: sh scripts/test-rn-android-compatibility.sh ${{ matrix.react-native }} new
+
   ios-build-test:
     name: iOS (newArch=${{ matrix.new-arch }})
     needs: changes
@@ -331,6 +388,7 @@ jobs:
           yarn test:web
           yarn test:web:browser
           yarn test:web:metro
+          yarn test:package
 
       - name: Verify npm package contents
         run: npm pack --dry-run --ignore-scripts
@@ -354,6 +412,7 @@ jobs:
           yarn typecheck
           yarn lint
           yarn test --runInBand
+          FUZZ_RUNS=2000 yarn test:fuzz
 
   site-test:
     name: Documentation Site and Playground Test
@@ -380,7 +439,17 @@ jobs:
 
   ci-complete:
     name: Complete CI
-    needs: [changes, quality, android-build, android-api-level-test, ios-build-test, web-test, site-test]
+    needs:
+      [
+        changes,
+        quality,
+        android-build,
+        android-api-level-test,
+        android-rn-compatibility,
+        ios-build-test,
+        web-test,
+        site-test,
+      ]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

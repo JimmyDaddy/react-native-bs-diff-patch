@@ -34,6 +34,7 @@
       <nav class="nav-links" aria-label="Primary navigation">
         <a href="#playground">Playground</a>
         <a href="#architecture">Architecture</a>
+        <a href="#evidence">Evidence</a>
         <a href="./docs/">Docs</a>
         <a
           class="github-link"
@@ -255,8 +256,8 @@
             <span class="card-number">02</span>
             <h3>Web Worker by default</h3>
             <p>
-              WASM work runs outside the page thread and terminates after each
-              operation.
+              WASM work runs outside the page thread; shared calls reuse the
+              initialized runtime and cancellation stays operation-local.
             </p>
           </article>
           <article>
@@ -274,6 +275,96 @@
               package gates.
             </p>
           </article>
+        </div>
+      </section>
+
+      <section
+        id="evidence"
+        class="evidence-section"
+        aria-labelledby="evidence-title"
+      >
+        <div class="evidence-heading">
+          <div>
+            <p class="section-kicker">Measured and compiled</p>
+            <h2 id="evidence-title">
+              Evidence behind the compatibility claim.
+            </h2>
+          </div>
+          <p>
+            The release gates compile real React Native artifacts, exercise one
+            golden patch across native and Web, fuzz malformed patches, and
+            install the packed npm tarball in clean consumers.
+          </p>
+        </div>
+
+        <div class="compatibility-strip" aria-label="React Native test matrix">
+          <article>
+            <span>RN 0.73.11</span>
+            <strong>Legacy + New</strong>
+            <p>TurboReactPackage boundary</p>
+          </article>
+          <article>
+            <span>RN 0.74.7</span>
+            <strong>New Architecture</strong>
+            <p>BaseReactPackage boundary</p>
+          </article>
+          <article>
+            <span>RN 0.86.0</span>
+            <strong>New Architecture</strong>
+            <p>Current matrix anchor</p>
+          </article>
+          <article class="package-footprint">
+            <span>npm tarball</span>
+            <strong>111 KiB packed</strong>
+            <p>390 KiB unpacked · 56 files</p>
+          </article>
+        </div>
+
+        <div class="benchmark-panel">
+          <div class="benchmark-copy">
+            <p class="section-kicker">WebAssembly reference</p>
+            <h3>Repeatable, not theoretical.</h3>
+            <p>
+              Apple M3 Pro · Node 26.5.0 · one changed byte per 4 KiB. Every run
+              verifies the restored bytes. Treat these as a development
+              baseline, not a browser performance guarantee.
+            </p>
+            <a class="text-link" href="./docs/architecture/"
+              >Benchmark methodology →</a
+            >
+          </div>
+          <div class="benchmark-table-wrap">
+            <table class="benchmark-table">
+              <thead>
+                <tr>
+                  <th scope="col">Input</th>
+                  <th scope="col">Diff</th>
+                  <th scope="col">Patch</th>
+                  <th scope="col">Delta</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">1 MiB</th>
+                  <td>158.5 ms</td>
+                  <td>7.7 ms</td>
+                  <td>110 B</td>
+                </tr>
+                <tr>
+                  <th scope="row">10 MiB</th>
+                  <td>4,243.6 ms</td>
+                  <td>57.5 ms</td>
+                  <td>118 B</td>
+                </tr>
+                <tr>
+                  <th scope="row">50 MiB</th>
+                  <td>30,697.5 ms</td>
+                  <td>285.2 ms</td>
+                  <td>203 B</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

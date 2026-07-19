@@ -10,6 +10,7 @@ import {
   diffBytes,
   patchBytes,
   type BinaryInput,
+  type BinaryOperationOptions,
 } from 'react-native-bs-diff-patch';
 ```
 
@@ -56,9 +57,16 @@ Reconstructs the target file at `outputFile`. Available on Android and iOS.
 ```ts
 type BinaryInput = ArrayBuffer | ArrayBufferView | Blob;
 
+interface BinaryOperationOptions {
+  signal?: AbortSignal;
+  maxInputBytes?: number;
+  maxOutputBytes?: number;
+}
+
 function diffBytes(
   oldData: BinaryInput,
-  newData: BinaryInput
+  newData: BinaryInput,
+  options?: BinaryOperationOptions
 ): Promise<Uint8Array>;
 ```
 
@@ -67,13 +75,16 @@ Creates a binary patch in a Web Worker. Available on Web.
 - Accepts `ArrayBuffer`, any typed-array or `DataView`, and `Blob`.
 - Copies inputs, so buffers owned by the caller are not detached.
 - Resolves to a new `Uint8Array` containing an `ENDSLEY/BSDIFF43` patch.
+- Checks each input against `maxInputBytes` and the generated patch against
+  `maxOutputBytes` when those limits are configured.
 
 ## `patchBytes`
 
 ```ts
 function patchBytes(
   oldData: BinaryInput,
-  patchData: BinaryInput
+  patchData: BinaryInput,
+  options?: BinaryOperationOptions
 ): Promise<Uint8Array>;
 ```
 
@@ -83,6 +94,21 @@ bytes. Available on Web.
 - Validates the patch header before invoking the WebAssembly core.
 - Copies inputs and resolves to a new `Uint8Array`.
 - Does not mutate `oldData` or `patchData`.
+- Rejects before allocating the declared output when the patch header exceeds
+  `maxOutputBytes`.
+
+## Web operation options
+
+- `signal` cancels the current Web operation. A call with a signal receives a
+  dedicated Worker so aborting it cannot interrupt another request.
+- `maxInputBytes` limits each supplied binary input, not their sum.
+- `maxOutputBytes` limits the generated patch or restored output.
+- Limits must be non-negative safe integers. Invalid limits reject with
+  `EINVAL`; exceeded limits reject with `ERESOURCE`.
+
+The binary APIs accept the options argument on native only to keep shared
+wrappers source-compatible, then reject with `EUNSUPPORTED` as usual. Native
+resource policy remains the application's filesystem/workflow responsibility.
 
 ## Availability behavior
 
@@ -110,6 +136,10 @@ type PatchError = Error & { code?: string };
 | `EEXIST`       | A native output path already exists.                        |
 | `EUNSUPPORTED` | The selected API is not available on the current platform.  |
 | `EUNAVAILABLE` | The native module worker has already shut down.             |
+| `EABORTED`     | The Web operation was cancelled through its signal.         |
+| `ERESOURCE`    | A configured Web input or output byte limit was exceeded.   |
+| `EDIFF`        | The native diff core rejected or could not write the input. |
+| `EPATCH`       | The native patch core rejected a malformed patch or output. |
 | `EWEBASSEMBLY` | WebAssembly loading, patch validation, or execution failed. |
 | `EUNSPECIFIED` | An unclassified native exception occurred.                  |
 
@@ -122,10 +152,11 @@ Worker startup, patch validation, or WebAssembly execution use
 
 ## Concurrency and ordering
 
-Each native platform uses a serial library-owned queue. Every Web call creates
-an isolated module Worker and terminates it after completion. Do not rely on
-operations completing in submission order across separate Web calls, and apply
-an application-level concurrency limit for large browser inputs.
+Each native platform uses a serial library-owned queue. Web calls without a
+signal share one module Worker, a serialized request queue, and a cached
+WebAssembly module. Calls with a signal use a dedicated Worker so cancellation
+is operation-local. Apply an application-level concurrency and memory budget
+for large browser inputs.
 
 ## Patch format
 

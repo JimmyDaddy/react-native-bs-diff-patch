@@ -4,6 +4,48 @@ function createError(code, message) {
   return error;
 }
 
+function validateLimit(value, fieldName) {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+    throw createError(
+      'EINVAL',
+      `${fieldName} must be a non-negative safe integer`
+    );
+  }
+}
+
+function inputByteLength(input) {
+  if (input instanceof ArrayBuffer || ArrayBuffer.isView(input)) {
+    return input.byteLength;
+  }
+  if (typeof Blob !== 'undefined' && input instanceof Blob) {
+    return input.size;
+  }
+  return undefined;
+}
+
+function enforceLimit(actualBytes, maximumBytes, fieldName) {
+  if (maximumBytes !== undefined && actualBytes > maximumBytes) {
+    throw createError(
+      'ERESOURCE',
+      `${fieldName} is ${actualBytes} bytes and exceeds the ${maximumBytes} byte limit`
+    );
+  }
+}
+
+function patchOutputSize(patchData) {
+  if (patchData.byteLength < 24) {
+    return undefined;
+  }
+  let outputSize = 0n;
+  for (let index = 23; index >= 16; index -= 1) {
+    if (index === 23 && (patchData[index] & 0x80) !== 0) {
+      return undefined;
+    }
+    outputSize = outputSize * 256n + BigInt(patchData[index]);
+  }
+  return outputSize;
+}
+
 async function toUint8Array(input, fieldName) {
   if (input instanceof ArrayBuffer) {
     return new Uint8Array(input.slice(0));
@@ -27,19 +69,104 @@ async function toUint8Array(input, fieldName) {
   );
 }
 
-async function runWorker(operation, oldInput, input) {
-  if (typeof Worker === 'undefined') {
-    throw createError(
-      'EUNSUPPORTED',
-      'Web Workers are required to run react-native-bs-diff-patch on Web'
-    );
+let sharedWorker;
+let sharedRequestId = 0;
+const sharedRequests = new Map();
+
+function responseError(operation, workerError) {
+  return createError(
+    workerError && workerError.code ? workerError.code : 'EWEBASSEMBLY',
+    workerError && workerError.message
+      ? workerError.message
+      : `${operation} worker failed`
+  );
+}
+
+function resetSharedWorker(error) {
+  sharedWorker?.terminate();
+  sharedWorker = undefined;
+  for (const request of sharedRequests.values()) {
+    request.reject(error);
+  }
+  sharedRequests.clear();
+}
+
+function getSharedWorker() {
+  if (sharedWorker) {
+    return sharedWorker;
   }
 
-  const [oldFileData, inputFileData] = await Promise.all([
-    toUint8Array(oldInput, 'oldData'),
-    toUint8Array(input, operation === 'diff' ? 'newData' : 'patchData'),
-  ]);
+  sharedWorker = new Worker(new URL('./worker.mjs', import.meta.url), {
+    type: 'module',
+  });
+  sharedWorker.onmessage = (event) => {
+    const request = sharedRequests.get(event.data && event.data.id);
+    if (!request) {
+      return;
+    }
+    sharedRequests.delete(event.data.id);
 
+    if (event.data.ok) {
+      try {
+        enforceLimit(
+          event.data.output.byteLength,
+          request.maxOutputBytes,
+          'output'
+        );
+        request.resolve(event.data.output);
+      } catch (error) {
+        request.reject(error);
+      }
+      return;
+    }
+    request.reject(responseError(request.operation, event.data.error));
+  };
+  sharedWorker.onerror = (event) => {
+    resetSharedWorker(
+      createError(
+        'EWEBASSEMBLY',
+        event.message || 'Shared Web Worker failed to load'
+      )
+    );
+  };
+  sharedWorker.onmessageerror = () => {
+    resetSharedWorker(
+      createError('EWEBASSEMBLY', 'Shared Web Worker response was invalid')
+    );
+  };
+  return sharedWorker;
+}
+
+function runSharedWorker(operation, oldFileData, inputFileData, options) {
+  const worker = getSharedWorker();
+  const id = ++sharedRequestId;
+
+  return new Promise((resolve, reject) => {
+    sharedRequests.set(id, {
+      maxOutputBytes: options.maxOutputBytes,
+      operation,
+      reject,
+      resolve,
+    });
+    try {
+      worker.postMessage(
+        {
+          id,
+          operation,
+          oldFileData,
+          inputFileData,
+          maxOutputBytes: options.maxOutputBytes,
+        },
+        [oldFileData.buffer, inputFileData.buffer]
+      );
+    } catch (error) {
+      sharedRequests.delete(id);
+      reject(error);
+    }
+  });
+}
+
+function runDedicatedWorker(operation, oldFileData, inputFileData, options) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./worker.mjs', import.meta.url), {
       type: 'module',
@@ -51,29 +178,36 @@ async function runWorker(operation, oldInput, input) {
         return;
       }
       settled = true;
+      options.signal?.removeEventListener('abort', abort);
       worker.terminate();
       callback();
     };
+    const abort = () => {
+      finish(() => reject(createError('EABORTED', `${operation} was aborted`)));
+    };
+
+    options.signal?.addEventListener('abort', abort, { once: true });
+    if (options.signal?.aborted) {
+      abort();
+      return;
+    }
 
     worker.onmessage = (event) => {
       if (event.data && event.data.ok) {
-        finish(() => resolve(event.data.output));
+        const output = event.data.output;
+        try {
+          enforceLimit(output.byteLength, options.maxOutputBytes, 'output');
+          finish(() => resolve(output));
+        } catch (error) {
+          finish(() => reject(error));
+        }
         return;
       }
 
-      const workerError = event.data && event.data.error;
       finish(() =>
-        reject(
-          createError(
-            workerError && workerError.code ? workerError.code : 'EWEBASSEMBLY',
-            workerError && workerError.message
-              ? workerError.message
-              : `${operation} worker failed`
-          )
-        )
+        reject(responseError(operation, event.data && event.data.error))
       );
     };
-
     worker.onerror = (event) => {
       finish(() =>
         reject(
@@ -84,7 +218,6 @@ async function runWorker(operation, oldInput, input) {
         )
       );
     };
-
     worker.onmessageerror = () => {
       finish(() =>
         reject(
@@ -96,11 +229,70 @@ async function runWorker(operation, oldInput, input) {
       );
     };
 
-    worker.postMessage({ operation, oldFileData, inputFileData }, [
-      oldFileData.buffer,
-      inputFileData.buffer,
-    ]);
+    try {
+      worker.postMessage(
+        {
+          operation,
+          oldFileData,
+          inputFileData,
+          maxOutputBytes: options.maxOutputBytes,
+        },
+        [oldFileData.buffer, inputFileData.buffer]
+      );
+    } catch (error) {
+      finish(() => reject(error));
+    }
   });
+}
+
+async function runWorker(operation, oldInput, input, options = {}) {
+  if (typeof Worker === 'undefined') {
+    throw createError(
+      'EUNSUPPORTED',
+      'Web Workers are required to run react-native-bs-diff-patch on Web'
+    );
+  }
+
+  validateLimit(options.maxInputBytes, 'maxInputBytes');
+  validateLimit(options.maxOutputBytes, 'maxOutputBytes');
+  if (options.signal?.aborted) {
+    throw createError('EABORTED', `${operation} was aborted`);
+  }
+
+  const oldInputBytes = inputByteLength(oldInput);
+  const inputBytes = inputByteLength(input);
+  if (oldInputBytes !== undefined) {
+    enforceLimit(oldInputBytes, options.maxInputBytes, 'oldData');
+  }
+  if (inputBytes !== undefined) {
+    enforceLimit(
+      inputBytes,
+      options.maxInputBytes,
+      operation === 'diff' ? 'newData' : 'patchData'
+    );
+  }
+
+  const [oldFileData, inputFileData] = await Promise.all([
+    toUint8Array(oldInput, 'oldData'),
+    toUint8Array(input, operation === 'diff' ? 'newData' : 'patchData'),
+  ]);
+
+  if (operation === 'patch' && options.maxOutputBytes !== undefined) {
+    const declaredOutputSize = patchOutputSize(inputFileData);
+    if (
+      declaredOutputSize !== undefined &&
+      declaredOutputSize > BigInt(options.maxOutputBytes)
+    ) {
+      throw createError(
+        'ERESOURCE',
+        `output exceeds the configured ${options.maxOutputBytes} byte limit`
+      );
+    }
+  }
+
+  return options.signal
+    ? runDedicatedWorker(operation, oldFileData, inputFileData, options)
+    : runSharedWorker(operation, oldFileData, inputFileData, options);
 }
 
 function rejectPathApi(methodName) {
@@ -120,10 +312,10 @@ export function patch() {
   return rejectPathApi('patch');
 }
 
-export function diffBytes(oldData, newData) {
-  return runWorker('diff', oldData, newData);
+export function diffBytes(oldData, newData, options) {
+  return runWorker('diff', oldData, newData, options);
 }
 
-export function patchBytes(oldData, patchData) {
-  return runWorker('patch', oldData, patchData);
+export function patchBytes(oldData, patchData, options) {
+  return runWorker('patch', oldData, patchData, options);
 }

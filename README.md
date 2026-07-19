@@ -13,7 +13,9 @@ all use the compatible `ENDSLEY/BSDIFF43` wire format.
 - **One patch format:** generate on one supported runtime and apply on another.
 - **Both React Native architectures:** legacy bridge and TurboModule/New Architecture.
 - **Responsive by default:** native work uses dedicated serial queues; Web work
-  runs in an isolated module Worker.
+  reuses a module Worker and cached WebAssembly instance off the page thread.
+- **Bound untrusted Web work:** built-in cancellation and input/output byte
+  limits reject predictably with stable error codes.
 - **No Web service required:** the browser implementation is the same bundled C
   core compiled to WebAssembly.
 
@@ -76,11 +78,20 @@ success.
 ```ts
 import { diffBytes, patchBytes } from 'react-native-bs-diff-patch';
 
-export async function webRoundTrip(oldFile: File, newFile: File) {
+export async function webRoundTrip(
+  oldFile: File,
+  newFile: File,
+  signal?: AbortSignal
+) {
   const oldData = await oldFile.arrayBuffer();
   const newData = await newFile.arrayBuffer();
-  const patchData = await diffBytes(oldData, newData);
-  const restoredData = await patchBytes(oldData, patchData);
+  const options = {
+    signal,
+    maxInputBytes: 64 * 1024 * 1024,
+    maxOutputBytes: 64 * 1024 * 1024,
+  };
+  const patchData = await diffBytes(oldData, newData, options);
+  const restoredData = await patchBytes(oldData, patchData, options);
 
   return { patchData, restoredData };
 }
@@ -88,18 +99,19 @@ export async function webRoundTrip(oldFile: File, newFile: File) {
 
 `diffBytes` and `patchBytes` accept `ArrayBuffer`, any `ArrayBufferView`
 (including typed arrays and `DataView`), or `Blob`. They resolve to a new
-`Uint8Array` and leave the caller's buffers usable.
+`Uint8Array` and leave the caller's buffers usable. Aborted operations reject
+with `EABORTED`; configured size limits reject with `ERESOURCE`.
 
 ## Platform API matrix
 
-| API                                     | Android | iOS | Web |
-| --------------------------------------- | ------- | --- | --- |
-| `diff(oldPath, newPath, patchPath)`     | Yes     | Yes | No  |
-| `patch(oldPath, outputPath, patchPath)` | Yes     | Yes | No  |
-| `diffBytes(oldData, newData)`           | No      | No  | Yes |
-| `patchBytes(oldData, patchData)`        | No      | No  | Yes |
-| Legacy architecture                     | Yes     | Yes | N/A |
-| New Architecture / TurboModule          | Yes     | Yes | N/A |
+| API                                        | Android | iOS | Web |
+| ------------------------------------------ | ------- | --- | --- |
+| `diff(oldPath, newPath, patchPath)`        | Yes     | Yes | No  |
+| `patch(oldPath, outputPath, patchPath)`    | Yes     | Yes | No  |
+| `diffBytes(oldData, newData, options?)`    | No      | No  | Yes |
+| `patchBytes(oldData, patchData, options?)` | No      | No  | Yes |
+| Legacy architecture                        | Yes     | Yes | N/A |
+| New Architecture / TurboModule             | Yes     | Yes | N/A |
 
 Calling an API family that is unavailable on the current platform rejects with
 `EUNSUPPORTED` instead of silently choosing different behavior.
@@ -117,6 +129,11 @@ Calling an API family that is unavailable on the current platform rejects with
 See [Production recipes](./docs/recipes.md) for error handling, downloads,
 cross-runtime patch exchange, and integrity checks.
 
+CI directly compiles the Android New Architecture sources against React Native
+0.73.11, 0.74.7, and 0.86.0. Packed-consumer tests also verify that browser,
+ESM, CommonJS, and TypeScript resolution work without installing optional React
+Native peers for Web-only consumers.
+
 ## Documentation
 
 - [Getting started](./docs/getting-started.md)
@@ -130,7 +147,8 @@ cross-runtime patch exchange, and integrity checks.
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the local workflow and quality
-gates.
+gates. Release history is in [CHANGELOG.md](./CHANGELOG.md); security reports
+follow [SECURITY.md](./SECURITY.md).
 
 ## License
 

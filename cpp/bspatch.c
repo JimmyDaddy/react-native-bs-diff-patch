@@ -46,12 +46,26 @@ static int64_t offtin(uint8_t *buf)
 	return y;
 }
 
+static int checked_add_int64(int64_t left, int64_t right, int64_t *result)
+{
+	if ((right > 0 && left > INT64_MAX - right) ||
+		(right < 0 && left < INT64_MIN - right))
+		return -1;
+	*result = left + right;
+	return 0;
+}
+
 int bspatch(const uint8_t* oldbuf, int64_t oldsize, uint8_t* newbuf, int64_t newsize, struct bspatch_stream* stream)
 {
 	uint8_t buf[8];
 	int64_t oldpos,newpos;
+	int64_t nextoldpos;
 	int64_t ctrl[3];
 	int64_t i;
+
+	if (oldbuf == NULL || newbuf == NULL || stream == NULL ||
+		stream->read == NULL || oldsize < 0 || newsize < 0)
+		return -1;
 
 	oldpos=0;newpos=0;
 	while(newpos<newsize) {
@@ -65,7 +79,8 @@ int bspatch(const uint8_t* oldbuf, int64_t oldsize, uint8_t* newbuf, int64_t new
 		/* Sanity-check */
 		if (ctrl[0]<0 || ctrl[0]>INT_MAX ||
 			ctrl[1]<0 || ctrl[1]>INT_MAX ||
-			newpos+ctrl[0]>newsize)
+			ctrl[0]>newsize-newpos ||
+			checked_add_int64(oldpos, ctrl[0], &nextoldpos))
 			return -1;
 
 		/* Read diff string */
@@ -79,10 +94,10 @@ int bspatch(const uint8_t* oldbuf, int64_t oldsize, uint8_t* newbuf, int64_t new
 
 		/* Adjust pointers */
 		newpos+=ctrl[0];
-		oldpos+=ctrl[0];
+		oldpos=nextoldpos;
 
 		/* Sanity-check */
-		if(newpos+ctrl[1]>newsize)
+		if(ctrl[1]>newsize-newpos)
 			return -1;
 
 		/* Read extra string */
@@ -91,7 +106,9 @@ int bspatch(const uint8_t* oldbuf, int64_t oldsize, uint8_t* newbuf, int64_t new
 
 		/* Adjust pointers */
 		newpos+=ctrl[1];
-		oldpos+=ctrl[2];
+		if (checked_add_int64(oldpos, ctrl[2], &nextoldpos))
+			return -1;
+		oldpos=nextoldpos;
 	};
 
 	return 0;
@@ -151,71 +168,100 @@ static off_t writeFileFromBuffer(int fd, uint8_t* buffer, off_t bufferSize)
 
 int bsPatchFile(const char* oldFile, const char* newFile, const char* patchFile)
 {
-  FILE * f;
-  int fd;
+  FILE * f = NULL;
+  int fd = -1;
   int bz2err;
+  int closeResult;
+  int result = -1;
+  int outputCreated = 0;
   uint8_t header[24];
-  uint8_t *old, *new;
-  int64_t oldsize, newsize;
-  BZFILE* bz2;
+  uint8_t *old = NULL, *new = NULL;
+  int64_t oldsize = 0, newsize = 0;
+  off_t measuredSize;
+  BZFILE* bz2 = NULL;
   struct bspatch_stream stream;
-  struct stat sb;
+
+  if (oldFile == NULL || newFile == NULL || patchFile == NULL)
+      goto cleanup;
 
   /* Open patch file */
-  if ((f = fopen(patchFile, "r")) == NULL) {
-      printf ("Cannot open file %s \n", patchFile);
-      err(1, "fopen(%s)", patchFile);
-  }
+  f = fopen(patchFile, "rb");
+  if (f == NULL)
+      goto cleanup;
 
   /* Read header */
-  if (fread(header, 1, 24, f) != 24) {
-      if (feof(f)) {
-          printf ("Corrupt patch %s \n", patchFile);
-          errx(1, "Corrupt patch\n");
-      }
-      err(1, "fread(%s)", patchFile);
-  }
+  if (fread(header, 1, 24, f) != 24)
+      goto cleanup;
 
   /* Check for appropriate magic */
-  if (memcmp(header, "ENDSLEY/BSDIFF43", 16) != 0) {
-      errx(1, "Corrupt patch\n");
-  }
+  if (memcmp(header, "ENDSLEY/BSDIFF43", 16) != 0)
+      goto cleanup;
 
   /* Read lengths from header */
   newsize=offtin(header+16);
-  if(newsize<0) {
-      errx(1,"Corrupt patch\n");
-  }
+  if(newsize < 0 || (uint64_t)newsize > SIZE_MAX - 1)
+      goto cleanup;
 
   /* Close patch file and re-open it via libbzip2 at the right places */
-  if(((fd=open(oldFile,O_RDONLY,0))<0) ||
-      ((oldsize=lseek(fd,0,SEEK_END))==-1) ||
-      ((old=malloc(oldsize+1))==NULL) ||
-      (lseek(fd,0,SEEK_SET)!=0) ||
-      (readFileToBuffer(fd,old,oldsize)!=oldsize) ||
-      (fstat(fd, &sb)) ||
-      (close(fd)==-1)) err(1,"%s", oldFile);
-  if((new=malloc(newsize+1))==NULL) err(1,NULL);
-  if (NULL == (bz2 = BZ2_bzReadOpen(&bz2err, f, 0, 1, NULL, 0))) {
-      errx(1, "BZ2_bzReadOpen, bz2err=%d", bz2err);
-  }
+  fd = open(oldFile, O_RDONLY, 0);
+  if (fd < 0)
+      goto cleanup;
+  measuredSize = lseek(fd, 0, SEEK_END);
+  if (measuredSize < 0 || (uint64_t)measuredSize > SIZE_MAX - 1)
+      goto cleanup;
+  oldsize = (int64_t)measuredSize;
+  old = malloc((size_t)oldsize + 1);
+  if (old == NULL || lseek(fd, 0, SEEK_SET) != 0 ||
+      readFileToBuffer(fd, old, (off_t)oldsize) != (off_t)oldsize)
+      goto cleanup;
+  closeResult = close(fd);
+  fd = -1;
+  if (closeResult != 0)
+      goto cleanup;
+
+  new = malloc((size_t)newsize + 1);
+  if (new == NULL)
+      goto cleanup;
+  bz2 = BZ2_bzReadOpen(&bz2err, f, 0, 1, NULL, 0);
+  if (bz2 == NULL || bz2err != BZ_OK)
+      goto cleanup;
 
   stream.read = bz2_read;
   stream.opaque = bz2;
-  if (bspatch(old, oldsize, new, newsize, &stream)) {
-      errx(1, "bspatch");
-  }
+  if (bspatch(old, oldsize, new, newsize, &stream))
+      goto cleanup;
 
   /* Clean up the bzip2 reads */
   BZ2_bzReadClose(&bz2err, bz2);
-  fclose(f);
+  bz2 = NULL;
+  closeResult = fclose(f);
+  f = NULL;
+  if (closeResult != 0)
+      goto cleanup;
 
   /* Write the new file */
-  if(((fd=open(newFile,O_CREAT|O_TRUNC|O_WRONLY,0666))<0) ||
-      (writeFileFromBuffer(fd,new,newsize)!=newsize) || (close(fd)==-1)) {
-      err(1,"%s",newFile);
-  }
+  fd = open(newFile, O_CREAT|O_EXCL|O_WRONLY, 0666);
+  if (fd < 0)
+      goto cleanup;
+  outputCreated = 1;
+  if (writeFileFromBuffer(fd, new, (off_t)newsize) != (off_t)newsize)
+      goto cleanup;
+  closeResult = close(fd);
+  fd = -1;
+  if (closeResult != 0)
+      goto cleanup;
+  result = 0;
+
+cleanup:
+  if (bz2 != NULL)
+      BZ2_bzReadClose(&bz2err, bz2);
+  if (f != NULL)
+      fclose(f);
+  if (fd >= 0)
+      close(fd);
+  if (result != 0 && outputCreated && newFile != NULL)
+      unlink(newFile);
   free(new);
   free(old);
-  return 0;
+  return result;
 }

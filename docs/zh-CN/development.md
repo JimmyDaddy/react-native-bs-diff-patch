@@ -31,11 +31,34 @@ yarn test --runInBand
 yarn test:web
 yarn test:web:browser
 yarn test:web:metro
+yarn test:package
 ```
 
 - `test:web` 检查 WebAssembly 往返和补丁 magic。
 - `test:web:browser` 在 Chrome 中运行公开 Worker API。
 - `test:web:metro` 证明 Metro 选择 `.web` 入口，而不是原生 TurboModule facade。
+- `test:package` 将真实 tarball 安装到干净消费者，验证 browser、ESM、CommonJS、
+  TypeScript 与可选 peer 行为。
+
+## 原生健壮性与兼容性
+
+```sh
+FUZZ_RUNS=2000 yarn test:fuzz
+scripts/test-rn-android-compatibility.sh 0.73.11 new
+scripts/test-rn-android-compatibility.sh 0.74.7 new
+scripts/test-rn-android-compatibility.sh 0.86.0 new
+```
+
+本地 Clang runtime 支持时，fuzz 门禁使用 libFuzzer、AddressSanitizer 与
+UndefinedBehaviorSanitizer；否则运行确定性 sanitizer 语料。兼容 fixture 会使用所选
+React Native artifact 直接编译真实 Android 模块源码，不依赖源码文本断言。
+
+可复现的 Web 性能基准命令：
+
+```sh
+yarn benchmark:web
+BENCHMARK_OUTPUT=/tmp/web-wasm.json yarn benchmark:web
+```
 
 ## 站点与文档
 
@@ -63,8 +86,10 @@ yarn test:web:browser
 
 ## 原生验证
 
-Android CI 构建两种架构模式，并在模拟器矩阵执行新架构设备级往返测试。iOS CI
-使用示例 Gemfile 锁定的 CocoaPods 版本构建并测试旧架构和新架构配置。
+Android CI 构建两种架构模式，使用 React Native 0.73.11、0.74.7 与 0.86.0
+直接编译新架构源码，并在模拟器矩阵执行新架构设备级往返测试。iOS CI 使用示例
+Gemfile 锁定的 CocoaPods 版本构建并测试旧架构和新架构配置。设备测试包含跨平台
+golden patch 和损坏补丁拒绝断言。
 
 本地示例命令见仓库
 [CONTRIBUTING.md](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/CONTRIBUTING.md)。
@@ -72,7 +97,7 @@ Android CI 构建两种架构模式，并在模拟器矩阵执行新架构设备
 ## 发布检查清单
 
 1. 执行核心、Web 和站点门禁。
-2. 检查 `npm pack --dry-run --ignore-scripts`，确认包含 `web/`。
+2. 运行 `yarn test:package`，并检查 `npm pack --dry-run --ignore-scripts`。
 3. 确认公开文档与导出的 TypeScript 声明一致。
 4. 确认中英文指南描述同一套公开行为。
 5. 运行 `yarn release` 创建版本、tag 和 GitHub Release；该命令不直接发布 npm。

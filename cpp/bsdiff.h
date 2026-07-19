@@ -38,7 +38,6 @@
 #endif
 
 #include <stdio.h>
-#include <err.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>

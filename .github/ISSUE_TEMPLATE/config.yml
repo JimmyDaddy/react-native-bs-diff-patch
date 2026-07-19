@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/JimmyDaddy/react-native-bs-diff-patch/security/advisories/new
+    about: Report security issues privately through GitHub.
+  - name: Documentation
+    url: https://bs-dff-patch.corerobin.com/docs/
+    about: Check setup, API, platform, and troubleshooting guidance first.

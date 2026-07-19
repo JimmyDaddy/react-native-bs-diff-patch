@@ -81,11 +81,16 @@ try {
 
   const result = await page.evaluate(() => window.__bsdiffWebTestResult);
   assert.deepEqual(result, {
+    activeAbortErrorCode: 'EABORTED',
+    abortErrorCode: 'EABORTED',
     inputsPreserved: true,
+    inputLimitErrorCode: 'ERESOURCE',
     invalidInputErrorCode: 'EINVAL',
+    outputLimitErrorCode: 'ERESOURCE',
     patchLength: result.patchLength,
     pathApiErrorCode: 'EUNSUPPORTED',
     restoredMatches: true,
+    sharedSurvivedAbort: true,
   });
   assert.ok(result.patchLength > 24);
   console.log('Browser Web Worker diff/patch round trip passed');

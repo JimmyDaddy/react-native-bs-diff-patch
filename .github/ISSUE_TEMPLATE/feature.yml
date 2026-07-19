@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a focused addition to the public API, runtime support, or tooling.
+title: '[Feature]: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    attributes:
+      label: Problem
+      description: Describe the user problem and the affected runtime.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed behavior
+      description: Explain the desired API or workflow, including compatibility expectations.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

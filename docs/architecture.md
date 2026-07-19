@@ -15,7 +15,7 @@ React Native JavaScript
 
 React Native Web
   -> typed public API
-  -> module Web Worker
+  -> shared or cancellation-scoped module Web Worker
   -> Emscripten MEMFS
   -> the same bsdiff + bzip2 C sources compiled to WebAssembly
 ```
@@ -23,6 +23,12 @@ React Native Web
 The worker boundaries keep expensive binary work away from the JavaScript/UI
 thread. They do not make the algorithm free: callers remain responsible for
 product-specific input-size and time limits.
+
+Web calls without an `AbortSignal` reuse one Worker and a cached Emscripten
+module, avoiding repeated Worker and WebAssembly initialization. Calls with a
+signal use a dedicated Worker; aborting the signal terminates only that Worker.
+Every Worker serializes its own request queue and removes temporary MEMFS files
+after each operation.
 
 ## Patch wire format
 
@@ -54,6 +60,32 @@ manifest when distributing patches.
 
 The generated `web/bsdiffpatch.mjs` is published with the package. Consumers do
 not need Emscripten.
+
+## Compatibility verification
+
+A checked-in golden fixture proves that the Web implementation generates the
+same deterministic patch bytes consumed by Android and iOS. Device runtime
+tests also apply the golden Web patch and reject a truncated patch without
+leaving partial output. The C patch core has sanitizer-backed malformed-input
+fuzz coverage and never terminates the hosting process for invalid data.
+
+## Reference Web benchmark
+
+`yarn benchmark:web` runs deterministic one-byte-per-4-KiB changes and verifies
+the restored result byte-for-byte. On an Apple M3 Pro with Node 26.5.0, the
+checked-in 2026-07-19 reference recorded:
+
+| Input  | Diff        | Patch    | Patch bytes |
+| ------ | ----------- | -------- | ----------- |
+| 1 MiB  | 158.5 ms    | 7.7 ms   | 110         |
+| 10 MiB | 4,243.6 ms  | 57.5 ms  | 118         |
+| 50 MiB | 30,697.5 ms | 285.2 ms | 203         |
+
+These figures are a reproducible development baseline, not a device or browser
+performance guarantee. Input similarity, CPU, browser, memory pressure, and
+toolchain version materially affect results. The full machine-readable record
+is in
+[`benchmarks/web-wasm.json`](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/benchmarks/web-wasm.json).
 
 ## Memory model
 

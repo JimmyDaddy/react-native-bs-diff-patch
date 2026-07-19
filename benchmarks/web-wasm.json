@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-07-19T01:33:43.029Z",
+  "runtime": {
+    "cpu": "Apple M3 Pro",
+    "node": "v26.5.0",
+    "platform": "darwin-arm64"
+  },
+  "workload": {
+    "description": "Deterministic buffers with one changed byte per 4 KiB",
+    "initializationMs": 14.6
+  },
+  "results": [
+    {
+      "sizeMiB": 1,
+      "diffMs": 158.5,
+      "patchMs": 7.7,
+      "patchBytes": 110
+    },
+    {
+      "sizeMiB": 10,
+      "diffMs": 4243.6,
+      "patchMs": 57.5,
+      "patchBytes": 118
+    },
+    {
+      "sizeMiB": 50,
+      "diffMs": 30697.5,
+      "patchMs": 285.2,
+      "patchBytes": 203
+    }
+  ]
+}

@@ -81,9 +81,11 @@ jobs:
           yarn typecheck
           yarn lint
           yarn test --runInBand
+          FUZZ_RUNS=2000 yarn test:fuzz
           yarn test:web
           yarn test:web:browser
           yarn test:web:metro
+          yarn test:package
           npm pack --dry-run --ignore-scripts
         env:
           CHROME_PATH: /usr/bin/google-chrome

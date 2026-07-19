@@ -4,11 +4,21 @@ import { StyleSheet, View, Text } from 'react-native';
 import { diff, patch } from 'react-native-bs-diff-patch';
 import * as FS from 'react-native-fs';
 
+import crossPlatformFixture from '../../fixtures/cross-platform.json';
+
 export default function App() {
   const newFile = FS.DocumentDirectoryPath + '/test1.txt';
   const oldFile = FS.DocumentDirectoryPath + '/test.txt';
   const patchFile = FS.DocumentDirectoryPath + '/patch.txt';
   const newFile1 = FS.DocumentDirectoryPath + '/test2.txt';
+  const goldenOldFile = FS.DocumentDirectoryPath + '/golden-old.bin';
+  const goldenNewFile = FS.DocumentDirectoryPath + '/golden-new.bin';
+  const goldenPatchFile = FS.DocumentDirectoryPath + '/golden.patch';
+  const goldenOutputFile = FS.DocumentDirectoryPath + '/golden-output.bin';
+  const generatedGoldenPatchFile =
+    FS.DocumentDirectoryPath + '/golden-generated.patch';
+  const corruptPatchFile = FS.DocumentDirectoryPath + '/corrupt.patch';
+  const corruptOutputFile = FS.DocumentDirectoryPath + '/corrupt-output.bin';
 
   const [textLength, setTextLength] = React.useState<number | undefined>();
   const [patchFileUri, setPatchFileUri] = React.useState<string | undefined>();
@@ -31,6 +41,20 @@ export default function App() {
           await FS.unlink(newFile1);
         }
 
+        for (const file of [
+          goldenOldFile,
+          goldenNewFile,
+          goldenPatchFile,
+          goldenOutputFile,
+          generatedGoldenPatchFile,
+          corruptPatchFile,
+          corruptOutputFile,
+        ]) {
+          if (await FS.exists(file)) {
+            await FS.unlink(file);
+          }
+        }
+
         const diffResult = await diff(oldFile, newFile, patchFile);
         const patchFileInfo = await FS.stat(patchFile);
         const patchResult = await patch(oldFile, newFile1, patchFile);
@@ -44,6 +68,63 @@ export default function App() {
           throw new Error(
             'diff/patch round trip produced an unexpected result'
           );
+        }
+
+        await FS.writeFile(
+          goldenOldFile,
+          crossPlatformFixture.oldBase64,
+          'base64'
+        );
+        await FS.writeFile(
+          goldenNewFile,
+          crossPlatformFixture.newBase64,
+          'base64'
+        );
+        await FS.writeFile(
+          goldenPatchFile,
+          crossPlatformFixture.patchBase64,
+          'base64'
+        );
+        await diff(goldenOldFile, goldenNewFile, generatedGoldenPatchFile);
+        const generatedGoldenPatch = await FS.readFile(
+          generatedGoldenPatchFile,
+          'base64'
+        );
+        if (generatedGoldenPatch !== crossPlatformFixture.patchBase64) {
+          throw new Error('native diff did not match the cross-platform patch');
+        }
+
+        await patch(goldenOldFile, goldenOutputFile, goldenPatchFile);
+        const restoredGoldenFile = await FS.readFile(
+          goldenOutputFile,
+          'base64'
+        );
+        if (restoredGoldenFile !== crossPlatformFixture.newBase64) {
+          throw new Error(
+            'native patch did not restore the cross-platform fixture'
+          );
+        }
+
+        await FS.writeFile(
+          corruptPatchFile,
+          'bm90IGEgYnNkaWZmIHBhdGNo',
+          'base64'
+        );
+        let corruptPatchErrorCode: string | undefined;
+        try {
+          await patch(goldenOldFile, corruptOutputFile, corruptPatchFile);
+        } catch (error) {
+          corruptPatchErrorCode = (error as { code?: string }).code;
+        }
+        if (corruptPatchErrorCode !== 'EPATCH') {
+          throw new Error(
+            `corrupt patch should reject with EPATCH, got ${String(
+              corruptPatchErrorCode
+            )}`
+          );
+        }
+        if (await FS.exists(corruptOutputFile)) {
+          throw new Error('corrupt patch left a partial output file');
         }
 
         if (!cancelled) {
@@ -75,7 +156,19 @@ export default function App() {
         }
       });
     };
-  }, [newFile, newFile1, oldFile, patchFile]);
+  }, [
+    corruptOutputFile,
+    corruptPatchFile,
+    generatedGoldenPatchFile,
+    goldenNewFile,
+    goldenOldFile,
+    goldenOutputFile,
+    goldenPatchFile,
+    newFile,
+    newFile1,
+    oldFile,
+    patchFile,
+  ]);
 
   return (
     <View style={styles.container}>

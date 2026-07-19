@@ -82,8 +82,14 @@ const encoder = new TextEncoder();
 const oldData = encoder.encode('version 1');
 const newData = encoder.encode('version 2 with web support');
 
-const patchData = await diffBytes(oldData, newData);
-const restoredData = await patchBytes(oldData, patchData);
+const controller = new AbortController();
+const options = {
+  signal: controller.signal,
+  maxInputBytes: 32 * 1024 * 1024,
+  maxOutputBytes: 32 * 1024 * 1024,
+};
+const patchData = await diffBytes(oldData, newData, options);
+const restoredData = await patchBytes(oldData, patchData, options);
 
 const matches =
   restoredData.length === newData.length &&
@@ -96,6 +102,10 @@ if (!matches) {
 
 输入在传给模块 Worker 前会被复制，因此调用方持有的缓冲区仍可继续使用。每次调用
 都会返回新的 `Uint8Array`。
+
+调用 `controller.abort()` 会让当前操作以 `EABORTED` 拒绝；命中配置的字节上限时
+以 `ERESOURCE` 拒绝。不带 signal 的调用会复用共享 Worker 与 WebAssembly 实例；
+带 signal 的调用使用专用 Worker，因此取消一个操作不会中断其他操作。
 
 ## 使用浏览器文件
 

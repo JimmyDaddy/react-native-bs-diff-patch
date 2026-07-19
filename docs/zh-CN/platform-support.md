@@ -11,8 +11,9 @@
 | 后台执行             | 串行 executor      | 串行队列 | 模块 Web Worker  |
 | 补丁格式             | `ENDSLEY/BSDIFF43` | 同左     | 同左             |
 
-示例应用持续验证 React Native 0.73。CI 也通过消费者 fixture 构建验证较新的新架构
-包 API，包括下面说明的 Android 包 API 分界。
+示例应用持续验证 React Native 0.73.2。Android 源码兼容矩阵会直接使用 React
+Native 0.73.11、0.74.7 与 0.86.0 编译新架构集成；常规 Android 构建还会编译
+0.73 旧架构。这些是已测试版本，并不承诺所有中间版本或未来版本必然兼容。
 
 ## Android
 
@@ -47,6 +48,7 @@ TurboModule 实例。
 - 模块 Web Worker；
 - `ArrayBuffer` 与 TypedArray；
 - 使用 `Blob` 输入时的 `Blob.arrayBuffer()`。
+- 使用操作取消功能时的 `AbortController`。
 
 Webpack 与 Vite 能识别标准的
 `new Worker(new URL(..., import.meta.url), { type: 'module' })` 模式。Metro Web
@@ -54,6 +56,10 @@ Webpack 与 Vite 能识别标准的
 
 Web 入口面向浏览器，不是 Node.js 文件系统适配器；它不会在 Node.js 中提供原生
 文件路径 API。
+
+未传 `AbortSignal` 的调用共用模块 Worker 与已初始化的 WebAssembly 模块；带
+signal 的调用使用专用 Worker，保证取消只影响当前任务。两种路径都会在各自 Worker
+内串行执行，但调用方仍应设置应用级内存预算。
 
 ## 服务端渲染
 

@@ -11,9 +11,11 @@
 | Background execution           | Serial executor    | Serial dispatch queue | Module Web Worker  |
 | Patch format                   | `ENDSLEY/BSDIFF43` | `ENDSLEY/BSDIFF43`    | `ENDSLEY/BSDIFF43` |
 
-The example application continuously exercises React Native 0.73. CI also
-builds consumer fixtures against newer New Architecture package APIs, including
-the Android package API split described below.
+The example application continuously exercises React Native 0.73.2. A direct
+Android source-compatibility matrix compiles the New Architecture integration
+against React Native 0.73.11, 0.74.7, and 0.86.0. The regular Android build also
+compiles the 0.73 legacy architecture. These are tested versions, not a promise
+that every intermediate or future React Native release is compatible.
 
 ## Android
 
@@ -49,6 +51,7 @@ The browser must support:
 - Module Web Workers.
 - `ArrayBuffer` and typed arrays.
 - `Blob.arrayBuffer()` when `Blob` inputs are used.
+- `AbortController` when operation cancellation is used.
 
 Webpack and Vite understand the standard
 `new Worker(new URL(..., import.meta.url), { type: 'module' })` pattern. A Metro
@@ -56,6 +59,11 @@ Web setup must preserve module-worker URLs in its Web serializer.
 
 The Web entry is browser-oriented rather than a Node.js filesystem adapter. It
 does not make the native file-path APIs available in Node.js.
+
+Calls without an `AbortSignal` share a module Worker and initialized
+WebAssembly module. Calls with a signal receive a dedicated Worker so
+cancellation is isolated to that operation. Both paths serialize work inside
+their Worker; callers should still enforce an application memory budget.
 
 ## Server-side rendering
 

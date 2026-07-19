@@ -328,6 +328,13 @@ int bsdiff(const uint8_t* oldBuf, int64_t oldsize, const uint8_t* newBuf, int64_
 	int result;
 	struct bsdiff_request req;
 
+	if (oldBuf == NULL || newBuf == NULL || stream == NULL ||
+		stream->malloc == NULL || stream->free == NULL || stream->write == NULL ||
+		oldsize < 0 || newsize < 0 ||
+		(uint64_t)oldsize > (SIZE_MAX / sizeof(int64_t)) - 1 ||
+		(uint64_t)newsize > SIZE_MAX - 1)
+		return -1;
+
 	if((req.I=stream->malloc((oldsize+1)*sizeof(int64_t)))==NULL)
 		return -1;
 
@@ -385,66 +392,103 @@ static int bz2_write(struct bsdiff_stream* stream, const void* buffer, int size)
 
 int bsDiffFile(const char* oldFile, const char* newFile, const char* patchFile)
 {
-    int fd;
+    int fd = -1;
     int bz2err;
-    uint8_t *old,*new;
-    off_t oldsize,newsize;
+    int closeResult;
+    int outputCreated = 0;
+    int result = -1;
+    uint8_t *old = NULL, *new = NULL;
+    int64_t oldsize = 0, newsize = 0;
+    off_t measuredSize;
     uint8_t buf[8];
-    FILE * pf;
+    FILE * pf = NULL;
     struct bsdiff_stream stream;
-    BZFILE* bz2;
+    BZFILE* bz2 = NULL;
 
-    memset(&bz2, 0, sizeof(bz2));
     stream.malloc = malloc;
     stream.free = free;
     stream.write = bz2_write;
 
-    /* Allocate oldsize+1 bytes instead of oldsize bytes to ensure
-        that we never try to malloc(0) and get a NULL pointer */
-    if(((fd=open(oldFile,O_RDONLY,0))<0) ||
-        ((oldsize=lseek(fd,0,SEEK_END))==-1) ||
-        ((old=malloc(oldsize+1))==NULL) ||
-        (lseek(fd,0,SEEK_SET)!=0) ||
-        (readFileToBuffer(fd,old,oldsize)!=oldsize) ||
-        (close(fd)==-1)) err(1,"%s",oldFile);
+    if (oldFile == NULL || newFile == NULL || patchFile == NULL)
+        goto cleanup;
 
-    /* Allocate newsize+1 bytes instead of newsize bytes to ensure
-        that we never try to malloc(0) and get a NULL pointer */
-    if(((fd=open(newFile,O_RDONLY,0))<0) ||
-        ((newsize=lseek(fd,0,SEEK_END))==-1) ||
-        ((new=malloc(newsize+1))==NULL) ||
-        (lseek(fd,0,SEEK_SET)!=0) ||
-        (readFileToBuffer(fd,new,newsize)!=newsize) ||
-        (close(fd)==-1)) err(1,"%s",newFile);
+    fd = open(oldFile, O_RDONLY, 0);
+    if (fd < 0)
+        goto cleanup;
+    measuredSize = lseek(fd, 0, SEEK_END);
+    if (measuredSize < 0 || (uint64_t)measuredSize > SIZE_MAX - 1)
+        goto cleanup;
+    oldsize = (int64_t)measuredSize;
+    old = malloc((size_t)oldsize + 1);
+    if (old == NULL || lseek(fd, 0, SEEK_SET) != 0 ||
+        readFileToBuffer(fd, old, (off_t)oldsize) != (off_t)oldsize)
+        goto cleanup;
+    closeResult = close(fd);
+    fd = -1;
+    if (closeResult != 0)
+        goto cleanup;
+
+    fd = open(newFile, O_RDONLY, 0);
+    if (fd < 0)
+        goto cleanup;
+    measuredSize = lseek(fd, 0, SEEK_END);
+    if (measuredSize < 0 || (uint64_t)measuredSize > SIZE_MAX - 1)
+        goto cleanup;
+    newsize = (int64_t)measuredSize;
+    new = malloc((size_t)newsize + 1);
+    if (new == NULL || lseek(fd, 0, SEEK_SET) != 0 ||
+        readFileToBuffer(fd, new, (off_t)newsize) != (off_t)newsize)
+        goto cleanup;
+    closeResult = close(fd);
+    fd = -1;
+    if (closeResult != 0)
+        goto cleanup;
 
     /* Create the patch file */
-    if ((pf = fopen(patchFile, "w")) == NULL)
-        err(1, "%s", patchFile);
+    fd = open(patchFile, O_CREAT|O_EXCL|O_WRONLY, 0666);
+    if (fd < 0)
+        goto cleanup;
+    outputCreated = 1;
+    pf = fdopen(fd, "wb");
+    if (pf == NULL)
+        goto cleanup;
+    fd = -1;
 
     /* Write header (signature+newsize)*/
     offtout(newsize, buf);
     if (fwrite("ENDSLEY/BSDIFF43", 16, 1, pf) != 1 ||
         fwrite(buf, sizeof(buf), 1, pf) != 1)
-        err(1, "Failed to write header");
+        goto cleanup;
 
-
-    if (NULL == (bz2 = BZ2_bzWriteOpen(&bz2err, pf, 9, 0, 0)))
-        errx(1, "BZ2_bzWriteOpen, bz2err=%d", bz2err);
+    bz2 = BZ2_bzWriteOpen(&bz2err, pf, 9, 0, 0);
+    if (bz2 == NULL || bz2err != BZ_OK)
+        goto cleanup;
 
     stream.opaque = bz2;
     if (bsdiff(old, oldsize, new, newsize, &stream))
-        err(1, "bsdiff");
+        goto cleanup;
 
     BZ2_bzWriteClose(&bz2err, bz2, 0, NULL, NULL);
+    bz2 = NULL;
     if (bz2err != BZ_OK)
-        err(1, "BZ2_bzWriteClose, bz2err=%d", bz2err);
+        goto cleanup;
 
-    if (fclose(pf))
-        err(1, "fclose");
+    closeResult = fclose(pf);
+    pf = NULL;
+    if (closeResult != 0)
+        goto cleanup;
+    result = 0;
 
-    /* Free the memory we used */
+cleanup:
+    if (bz2 != NULL)
+        BZ2_bzWriteClose(&bz2err, bz2, 1, NULL, NULL);
+    if (pf != NULL)
+        fclose(pf);
+    if (fd >= 0)
+        close(fd);
+    if (result != 0 && outputCreated && patchFile != NULL)
+        unlink(patchFile);
     free(old);
     free(new);
-
-    return 0;
+    return result;
 }
