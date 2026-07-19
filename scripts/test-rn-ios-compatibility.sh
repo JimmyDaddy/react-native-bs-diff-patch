@@ -49,10 +49,10 @@ package_tarball_name=$(node -e '
 ' "$repository_directory/package.json")
 package_tarball="$temporary_directory/$package_tarball_name"
 
-npm pack \
-  --ignore-scripts \
-  --pack-destination "$temporary_directory" \
-  "$repository_directory"
+(
+  cd "$repository_directory"
+  node .yarn/releases/yarn-3.6.1.cjs pack --out "$package_tarball"
+)
 
 if [ ! -f "$package_tarball" ]; then
   echo "Expected npm package was not created: $package_tarball" >&2
