@@ -362,7 +362,16 @@ jobs:
         run: |
           set -o pipefail
           cd example/ios
-          xcodebuild -workspace BsDiffPatchExample.xcworkspace -scheme BsDiffPatchExample -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" test | bundle exec xcpretty
+          xcodebuild \
+            -workspace BsDiffPatchExample.xcworkspace \
+            -scheme BsDiffPatchExample \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" \
+            EXPECTED_NEW_ARCH=${{ matrix.new-arch }} \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) EXPECTED_NEW_ARCH=$(EXPECTED_NEW_ARCH)' \
+            test | bundle exec xcpretty
 
       - name: Upload iOS test results
         if: always()

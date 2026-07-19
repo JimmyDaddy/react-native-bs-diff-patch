@@ -9,7 +9,10 @@
 #define ARCHITECTURE_STATUS_ID @"architecture-status"
 #define SUCCESS_STATUS @"Runtime: success"
 #define ERROR_STATUS_PREFIX @"Runtime: error:"
-#ifdef RCT_NEW_ARCH_ENABLED
+#ifndef EXPECTED_NEW_ARCH
+#error "EXPECTED_NEW_ARCH must be provided by the iOS runtime test"
+#endif
+#if EXPECTED_NEW_ARCH
 #define EXPECTED_ARCHITECTURE @"new"
 #else
 #define EXPECTED_ARCHITECTURE @"old"
