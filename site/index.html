@@ -152,6 +152,14 @@
             <button id="generate-patch" class="primary-button" type="button">
               Generate patch <span aria-hidden="true">→</span>
             </button>
+            <button
+              id="cancel-operation"
+              class="secondary-button danger-button"
+              type="button"
+              disabled
+            >
+              Cancel active
+            </button>
             <div class="worker-note">
               <strong>Worker isolated</strong>
               <span>No payload data leaves this page.</span>
@@ -164,6 +172,31 @@
             >
               Download .patch
             </button>
+          </div>
+
+          <div class="operation-controls">
+            <label>
+              <span>Max input</span>
+              <select id="max-input-bytes">
+                <option value="">No limit</option>
+                <option value="64">64 B (error demo)</option>
+                <option value="1024">1 KiB</option>
+                <option value="1048576">1 MiB</option>
+              </select>
+            </label>
+            <label>
+              <span>Max output</span>
+              <select id="max-output-bytes">
+                <option value="">No limit</option>
+                <option value="64">64 B (error demo)</option>
+                <option value="1024">1 KiB</option>
+                <option value="1048576">1 MiB</option>
+              </select>
+            </label>
+            <div class="operation-progress">
+              <span><strong id="operation-phase">Idle</strong><output id="operation-percent">0%</output></span>
+              <progress id="operation-progress" max="1" value="0">0%</progress>
+            </div>
           </div>
 
           <div class="metrics" aria-live="polite">
@@ -179,6 +212,10 @@
               <span>Runtime</span>
               <strong id="runtime-ms">—</strong>
             </div>
+            <div class="metric">
+              <span>Error code</span>
+              <strong id="error-code">—</strong>
+            </div>
           </div>
 
           <footer class="playground-footer">
@@ -193,6 +230,53 @@
             <span>ENDSLEY / BSDIFF43</span>
           </footer>
         </section>
+      </section>
+
+      <section class="control-showcase" aria-labelledby="controls-title">
+        <header>
+          <p class="section-kicker">Same controls, explicit contracts</p>
+          <h2 id="controls-title">Progress and cancel on native. AbortSignal on Web.</h2>
+          <p>
+            The playground above executes the browser API. Use the matching
+            path-based job facade in Android and iOS applications.
+          </p>
+        </header>
+        <div class="control-code-grid">
+          <article>
+            <div class="code-label"><span>Android / iOS</span><strong>Native job</strong></div>
+            <pre><code><span class="token-keyword">const</span> job = <span class="token-function">startPatch</span>(oldPath, outputPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+
+<span class="token-keyword">const</span> off = job.onProgress(({ phase, progress }) =&gt;
+  renderProgress(phase, progress)
+);
+
+cancelButton.onPress = () =&gt; job.cancel();
+<span class="token-keyword">await</span> job.result.finally(off);</code></pre>
+          </article>
+          <article>
+            <div class="code-label"><span>React Native Web</span><strong>Worker + signal</strong></div>
+            <pre><code><span class="token-keyword">const</span> controller = <span class="token-keyword">new</span> AbortController();
+<span class="token-keyword">const</span> options = {
+  signal: controller.signal,
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+};
+
+cancelButton.onclick = () =&gt; controller.abort();
+<span class="token-keyword">const</span> delta = <span class="token-keyword">await</span> <span class="token-function">diffBytes</span>(oldBytes, newBytes, options);</code></pre>
+          </article>
+        </div>
+        <div class="error-contract" aria-label="Operation error codes">
+          <span><code>ECANCELLED</code> Native cancelled</span>
+          <span><code>EINPUT_TOO_LARGE</code> Native input limit</span>
+          <span><code>EOUTPUT_TOO_LARGE</code> Native output limit</span>
+          <span><code>EABORTED</code> Web cancelled</span>
+          <span><code>ERESOURCE</code> Web size limit</span>
+          <span><code>EUNSUPPORTED</code> Wrong platform API</span>
+        </div>
       </section>
 
       <section
@@ -315,8 +399,8 @@
           </article>
           <article class="package-footprint">
             <span>npm tarball</span>
-            <strong>111 KiB packed</strong>
-            <p>390 KiB unpacked · 56 files</p>
+            <strong>122 KiB packed</strong>
+            <p>452 KiB unpacked · 58 files</p>
           </article>
         </div>
 

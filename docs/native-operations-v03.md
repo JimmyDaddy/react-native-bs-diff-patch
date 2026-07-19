@@ -1,88 +1,85 @@
-# Native operations roadmap for 0.3
+# Controllable native operations
 
-Version 0.2 established background execution, deterministic cross-platform
-patches, malformed-input cleanup, and browser-side cancellation and limits.
-The 0.3 native work will add the same production controls without changing the
-existing `diff` and `patch` signatures.
+Version 0.3 adds job-based Android and iOS operations for progress, cooperative
+cancellation, resource limits, and atomic output. The original `diff` and
+`patch` promise APIs remain source compatible and do not acquire implicit
+limits.
 
-This is an implementation contract. Public names remain provisional until the
-0.3 beta, but the behavior and error model below are the acceptance criteria.
-
-## Public shape
-
-The existing promise APIs stay source compatible. A job API is added for
-callers that need limits, cancellation, or progress:
+## Public API
 
 ```ts
-type NativeOperationOptions = {
-  maxInputBytes?: number;
-  maxOutputBytes?: number;
-};
+import { startPatch } from 'react-native-bs-diff-patch';
 
-type NativeOperationProgress = {
-  id: string;
-  operation: 'diff' | 'patch';
-  phase: 'reading' | 'processing' | 'writing';
-  progress: number; // monotonic, from 0 through 1
-};
+const job = startPatch(oldPath, outputPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
 
-const job = startPatch(oldFile, newFile, patchFile, options);
-const unsubscribe = job.onProgress((event) => updateUi(event.progress));
+const unsubscribe = job.onProgress(({ phase, progress }) => {
+  updateProgress({ phase, percent: Math.round(progress * 100) });
+});
+
+try {
+  await job.result;
+} finally {
+  unsubscribe();
+}
+
+// From a separate UI action:
 await job.cancel();
-await job.result;
-unsubscribe();
 ```
 
-`diff` and `patch` continue to use the same serialized native worker. They do
-not acquire implicit size limits, so upgrading does not reject an operation
-that previously succeeded.
+`startDiff(oldPath, newPath, patchPath, options?)` has the same job shape.
+`job.result` resolves to `0`; `job.cancel()` is idempotent from the caller's
+perspective; and `job.onProgress()` returns an unsubscribe function.
 
 ## Resource limits
 
-- Validate every numeric limit in JavaScript and native code as a positive,
-  safe integer.
-- Check input file sizes before allocating operation buffers.
-- Check the patch header before allocating restored output.
-- Enforce generated-output limits while writing, not only after completion.
-- Reject with `EINPUT_TOO_LARGE` or `EOUTPUT_TOO_LARGE`; include the configured
-  limit and observed byte count in native error metadata.
+`maxInputBytes` and `maxOutputBytes` must be positive safe integers when
+provided. Limits are per operation and have no library default because safe
+values depend on device class and the host application's memory budget.
 
-Limits are per operation. The package will not choose a universal default
-because safe values depend on device class and the host application's memory
-budget.
+- `maxInputBytes` checks each native input before allocating operation buffers.
+- `maxOutputBytes` checks a patch's declared restored size before allocation.
+- Patch generation also checks its compressed output while it is being written.
+- Limit failures reject with `EINPUT_TOO_LARGE` or `EOUTPUT_TOO_LARGE`.
 
 ## Cancellation and progress
 
-Cancellation is cooperative. The shared C core receives a callback context and
-checks it during file reads, suffix processing, compression/decompression, and
-output writes. A cancelled operation rejects with `ECANCELLED` and never emits
-another progress event.
+Cancellation is cooperative. The shared C core checks it during file reads,
+suffix processing, compression/decompression, and output writes. A cancelled
+operation rejects with `ECANCELLED`, removes its temporary output, and emits no
+later progress events.
 
-Progress is phase based and monotonic. It is not an ETA: suffix sorting and
-compression are data dependent. Native code rate-limits events to avoid
-crossing the React Native bridge more than ten times per second.
+Progress is phase based and monotonic, not an ETA. Events contain the job `id`,
+the `diff` or `patch` operation, a `reading`, `processing`, or `writing` phase,
+and a normalized value from 0 through 1. Native delivery is rate-limited to at
+most ten events per second except at phase boundaries and completion.
 
 ## Atomic output
 
-0.2 already removes an output created by a failed operation. In 0.3, job-based
-operations strengthen this to an atomic commit:
+Job operations write to an exclusively created sibling temporary file, flush
+and validate it, then commit it at the destination. The destination must not
+already exist, and failed, limited, or cancelled jobs do not expose a partial
+output. Existing `diff` and `patch` keep their established behavior.
 
-1. create a unique sibling temporary file with exclusive creation;
-2. write, flush, close, and validate the result;
-3. rename the temporary file to the requested output path;
-4. remove the temporary file on error or cancellation.
+## Platform behavior
 
-The destination must not exist. Rename must stay on the same filesystem; the
-library will not silently fall back to a copy.
+The job API is available on Android and iOS. React Native Web uses the binary
+`diffBytes` and `patchBytes` APIs with an `AbortSignal` and byte limits instead;
+calling `startDiff` or `startPatch` on Web rejects with `EUNSUPPORTED`.
 
-## Delivery sequence
+The patch wire format remains `ENDSLEY/BSDIFF43`. Operation control changes
+execution behavior, not patch compatibility.
 
-1. Add cancellable/limited C stream callbacks and deterministic C tests.
-2. Add Android and iOS job registries, event delivery, and cleanup tests.
-3. Expose the TypeScript job facade while keeping `diff` and `patch` unchanged.
-4. Run API 24 Android and iOS simulator cancellation/resource-limit tests.
-5. Publish a 0.3 beta, validate registry consumers, then promote the stable
-   release without changing patch bytes.
+## Verification
 
-The patch wire format remains `ENDSLEY/BSDIFF43`; 0.3 changes operation control,
-not compatibility.
+The repository verifies the controls at three levels:
+
+1. deterministic C tests cover progress, limits, cancellation, destination
+   preservation, malformed input, and temporary-file cleanup;
+2. Android API 24/31 and iOS Simulator tests invoke the public JavaScript job
+   facade through the New Architecture runtime;
+3. React Native 0.73.11/0.74.7 compatibility fixtures compile the packaged
+   native APIs, while the full RN 0.86 example supplies the current-version
+   build and runtime gate.

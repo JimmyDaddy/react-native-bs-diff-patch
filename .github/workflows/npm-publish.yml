@@ -81,6 +81,7 @@ jobs:
           yarn typecheck
           yarn lint
           yarn test --runInBand
+          yarn test:native-operations
           FUZZ_RUNS=2000 yarn test:fuzz
           yarn test:web
           yarn test:web:browser

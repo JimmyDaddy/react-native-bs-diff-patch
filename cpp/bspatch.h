@@ -28,11 +28,7 @@
 #ifndef BSPATCH_H
 #define BSPATCH_H
 
-#if __has_include(<bzlib.h>)
-#include <bzlib.h>
-#else
 #include "bzlib/bzlib.h"
-#endif
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -47,6 +43,8 @@ struct bspatch_stream
 {
 	void* opaque;
 	int (*read)(const struct bspatch_stream* stream, void* buffer, int length);
+	int (*is_cancelled)(const struct bspatch_stream* stream);
+	void (*progress)(const struct bspatch_stream* stream, double progress);
 };
 
 int bspatch(const uint8_t* oldbuf, int64_t oldsize, uint8_t* newbuf, int64_t newsize, struct bspatch_stream* stream);

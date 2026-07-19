@@ -502,11 +502,82 @@ code {
 .play-actions {
   min-height: 90px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
   gap: 20px;
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
+}
+
+.danger-button:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.operation-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.55fr) minmax(150px, 0.55fr) minmax(240px, 1fr);
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.operation-controls label,
+.operation-progress {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+  color: var(--muted);
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.operation-controls select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  color: #c6d1d4;
+  background: var(--panel-black);
+  border: 1px solid var(--line-bright);
+  border-radius: 0;
+  font: 600 10px/1 var(--mono);
+}
+
+.operation-controls select:focus {
+  border-color: var(--cyan);
+  outline: none;
+}
+
+.operation-progress > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.operation-progress strong {
+  color: var(--cyan);
+}
+
+.operation-progress progress {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  appearance: none;
+  background: var(--panel-black);
+  border: 1px solid var(--line-bright);
+}
+
+.operation-progress progress::-webkit-progress-bar {
+  background: var(--panel-black);
+}
+
+.operation-progress progress::-webkit-progress-value {
+  background: var(--cyan);
+}
+
+.operation-progress progress::-moz-progress-bar {
+  background: var(--cyan);
 }
 
 .primary-button,
@@ -595,10 +666,104 @@ code {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
+}
+
+.control-showcase {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  border-bottom: 1px solid var(--line);
+}
+
+.control-showcase > header {
+  padding: 52px 34px;
+  border-right: 1px solid var(--line);
+}
+
+.control-showcase h2 {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.control-showcase header > p:last-child {
+  max-width: 520px;
+  margin: 24px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.control-code-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+}
+
+.control-code-grid article {
+  min-width: 0;
+  background: var(--panel-black);
+  border-right: 1px solid var(--line);
+}
+
+.control-code-grid article:last-child {
+  border-right: 0;
+}
+
+.code-label {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.code-label strong {
+  color: var(--lime);
+}
+
+.control-code-grid pre {
+  min-height: 300px;
+  margin: 0;
+  padding: 24px 18px;
+  overflow: auto;
+  color: #c6d1d4;
+  font: 500 10px/1.7 var(--mono);
+}
+
+.error-contract {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--line);
+}
+
+.error-contract span {
+  min-width: 0;
+  padding: 14px 18px;
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font: 600 9px/1.45 var(--mono);
+}
+
+.error-contract span:nth-child(3n) {
+  border-right: 0;
+}
+
+.error-contract code {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--orange);
 }
 
 .metric {
@@ -630,6 +795,11 @@ code {
 .metric strong.negative {
   color: var(--orange);
   font-size: 14px;
+}
+
+.metric #error-code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
 }
 
 .playground-footer {
@@ -1288,6 +1458,15 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .control-showcase {
+    grid-template-columns: 1fr;
+  }
+
+  .control-showcase > header {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
   .architecture-intro {
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -1402,6 +1581,16 @@ code {
 
   .play-actions {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .operation-controls,
+  .control-code-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-code-grid article {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .worker-note {
@@ -1557,6 +1746,16 @@ code {
 
   .metrics {
     padding-inline: 14px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .error-contract {
+    grid-template-columns: 1fr;
+  }
+
+  .error-contract span,
+  .error-contract span:nth-child(3n) {
+    border-right: 0;
   }
 
   .playground-footer {

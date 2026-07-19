@@ -1,73 +1,76 @@
-# 0.3 原生操作路线图
+# 可控制的原生操作
 
-0.2 已完成后台执行、跨平台确定性补丁、畸形输入清理，以及浏览器端的取消和资源
-限制。0.3 会在不改变现有 `diff`、`patch` 签名的前提下，为原生端补齐同类生产控制。
+0.3 为 Android 与 iOS 增加了 job API，用于监听进度、协作式取消、限制资源并
+原子提交输出。原有 `diff`、`patch` Promise API 保持源码兼容，也不会自动增加
+默认限制。
 
-本文是实现约定。公开命名在 0.3 beta 前仍可调整，但以下行为和错误模型是验收条件。
-
-## 公开接口形态
-
-现有 Promise API 保持源码兼容；需要限制、取消或进度的调用方使用新增 job API：
+## 公共 API
 
 ```ts
-type NativeOperationOptions = {
-  maxInputBytes?: number;
-  maxOutputBytes?: number;
-};
+import { startPatch } from 'react-native-bs-diff-patch';
 
-type NativeOperationProgress = {
-  id: string;
-  operation: 'diff' | 'patch';
-  phase: 'reading' | 'processing' | 'writing';
-  progress: number; // 从 0 到 1，单调递增
-};
+const job = startPatch(oldPath, outputPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
 
-const job = startPatch(oldFile, newFile, patchFile, options);
-const unsubscribe = job.onProgress((event) => updateUi(event.progress));
+const unsubscribe = job.onProgress(({ phase, progress }) => {
+  updateProgress({ phase, percent: Math.round(progress * 100) });
+});
+
+try {
+  await job.result;
+} finally {
+  unsubscribe();
+}
+
+// 可在单独的 UI 操作中调用：
 await job.cancel();
-await job.result;
-unsubscribe();
 ```
 
-`diff` 和 `patch` 继续使用同一个串行原生 worker，且不会隐式增加大小上限，因此升级
-不会让原本成功的操作突然被拒绝。
+`startDiff(oldPath, newPath, patchPath, options?)` 返回相同结构。`job.result`
+成功时返回 `0`，`job.cancel()` 对调用方可重复执行，`job.onProgress()` 返回取消
+订阅函数。
 
 ## 资源限制
 
-- JavaScript 与原生端都要把每个限制校验为正的安全整数。
-- 分配操作缓冲区前检查输入文件大小。
-- 分配还原输出前检查补丁头声明的长度。
-- 生成输出时持续执行限制，而不是完成后才检查。
-- 超限分别拒绝为 `EINPUT_TOO_LARGE` 或 `EOUTPUT_TOO_LARGE`，原生错误元数据包含
-  配置上限和实际字节数。
+传入的 `maxInputBytes`、`maxOutputBytes` 必须是正安全整数。限制只作用于当前任务；
+库不设置统一默认值，因为安全范围取决于设备级别和宿主应用的内存预算。
 
-限制按操作设置。库不提供通用默认值，因为安全值取决于设备档位和宿主应用的内存预算。
+- `maxInputBytes` 会在分配操作缓冲区前检查每个原生输入。
+- `maxOutputBytes` 会在分配还原缓冲区前检查补丁声明的输出大小。
+- 生成补丁时也会在写入压缩结果的过程中检查输出上限。
+- 超过限制分别以 `EINPUT_TOO_LARGE`、`EOUTPUT_TOO_LARGE` 拒绝。
 
 ## 取消与进度
 
-取消采用协作式检查。共用 C 核心接收回调上下文，并在文件读取、后缀处理、压缩与
-解压、输出写入阶段检查取消状态。取消后以 `ECANCELLED` 拒绝，且不再发送进度事件。
+取消采用协作式机制。共用 C 核心会在读取文件、后缀处理、压缩/解压和输出写入时
+检查取消状态。取消后的操作以 `ECANCELLED` 拒绝、删除临时输出，并且不会继续发送
+进度事件。
 
-进度按阶段计算并单调递增，但不是 ETA：后缀排序和压缩耗时受数据影响。原生端把
-事件频率限制为每秒最多十次，避免频繁跨越 React Native 边界。
+进度按阶段单调递增，并不代表 ETA。事件包含任务 `id`、`diff` 或 `patch` 操作、
+`reading`、`processing`、`writing` 阶段，以及 0 到 1 的归一化进度。除阶段切换与
+完成事件外，原生端最多每秒发送十次。
 
 ## 原子输出
 
-0.2 已保证失败时删除本次创建的输出。0.3 的 job 操作进一步使用原子提交：
+job 操作会独占创建同目录临时文件，完成写入、刷新与校验后再提交到目标路径。目标
+文件不能已经存在；失败、命中限制或取消的任务都不会暴露半成品。原有 `diff`、
+`patch` 保持既有行为。
 
-1. 在目标文件同目录以排他模式创建唯一临时文件；
-2. 写入、flush、关闭并验证结果；
-3. 将临时文件 rename 为目标路径；
-4. 出错或取消时删除临时文件。
+## 平台差异
 
-目标文件必须不存在；rename 必须发生在同一文件系统，库不会静默退化成复制。
+job API 仅用于 Android 与 iOS。React Native Web 应使用二进制 `diffBytes`、
+`patchBytes` API，并通过 `AbortSignal` 与字节限制控制任务；Web 调用 `startDiff`
+或 `startPatch` 会以 `EUNSUPPORTED` 拒绝。
 
-## 交付顺序
+补丁格式仍是 `ENDSLEY/BSDIFF43`。0.3 改变的是操作控制，不是补丁兼容性。
 
-1. 为 C stream 增加可取消、可限制的回调和确定性 C 测试。
-2. 增加 Android/iOS job registry、事件发送与清理测试。
-3. 暴露 TypeScript job facade，同时保持 `diff`、`patch` 不变。
-4. 在 Android API 24 与 iOS 模拟器执行取消和资源限制运行时测试。
-5. 发布 0.3 beta，验证 registry 消费者，再发布稳定版且不改变补丁字节。
+## 验证范围
 
-补丁格式仍是 `ENDSLEY/BSDIFF43`；0.3 改变的是操作控制，不是兼容性。
+仓库从三个层级验证这些能力：
+
+1. 确定性 C 测试覆盖进度、限制、取消、目标文件保护、畸形输入与临时文件清理；
+2. Android API 24/31 与 iOS Simulator 通过新架构运行时调用公共 JavaScript job API；
+3. React Native 0.73.11/0.74.7 兼容 fixture 编译发布包原生 API，完整 RN 0.86
+   示例负责当前版本的构建与运行时门禁。

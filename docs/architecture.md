@@ -9,7 +9,7 @@ adapters.
 React Native JavaScript
   -> typed public API
   -> TurboModule or legacy bridge
-  -> platform-owned serial worker queue
+  -> platform job registry and serial operation boundary
   -> JNI / Objective-C++
   -> shared bsdiff + bzip2 C sources
 
@@ -23,6 +23,11 @@ React Native Web
 The worker boundaries keep expensive binary work away from the JavaScript/UI
 thread. They do not make the algorithm free: callers remain responsible for
 product-specific input-size and time limits.
+
+Native jobs carry cancellation and progress callbacks into the C streams.
+Outputs are written to an exclusive sibling temporary file and committed only
+after the operation has flushed successfully. The legacy promise API shares the
+same serial operation boundary but does not add implicit limits.
 
 Web calls without an `AbortSignal` reuse one Worker and a cached Emscripten
 module, avoiding repeated Worker and WebAssembly initialization. Calls with a
@@ -114,9 +119,9 @@ output size. The native reference reaches roughly nineteen times the input size
 for this highly similar 50 MiB fixture, primarily because of the suffix array
 and simultaneous file buffers.
 
-For very large updates, enforce an application limit before calling the
-library, and consider a server-side or streaming update strategy when the full
-files cannot safely fit in memory.
+For very large updates, configure native/Web operation limits (or check before
+calling the legacy API), and consider a server-side or streaming update
+strategy when the full files cannot safely fit in memory.
 
 ## Ownership boundaries
 
@@ -126,7 +131,7 @@ owns:
 - file selection, storage permissions, and temporary-file cleanup;
 - patch transport and cache policy;
 - authentication and cryptographic integrity checks;
-- concurrency, size, and time limits;
+- choosing concurrency, size, and time policies and passing supported limits;
 - verification and atomic replacement of the restored output.
 
 Keeping these responsibilities outside the patch engine lets applications use

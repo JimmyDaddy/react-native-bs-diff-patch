@@ -8,6 +8,7 @@ Start with the error `code`, then confirm the runtime and input model:
 | `ENOENT`, `EEXIST`, `EINVAL`     | Inspect path state before starting native work   |
 | `EUNSUPPORTED`                   | Confirm that the correct API family was selected |
 | `EABORTED`, `ERESOURCE`          | Check Web cancellation and byte limits           |
+| `ECANCELLED`, native limit codes | Check native job cancellation and configured bounds |
 | `EDIFF`, `EPATCH`                | Check native I/O and patch integrity             |
 | Worker or `EWEBASSEMBLY` failure | Check emitted Web assets, CSP, and patch magic   |
 | High memory use                  | Enforce input and concurrency limits             |
@@ -55,6 +56,13 @@ means an input, generated patch, or declared restored output exceeded the
 configured byte limit. Both are expected control-flow errors rather than a
 WebAssembly failure.
 
+## `ECANCELLED`, `EINPUT_TOO_LARGE`, or `EOUTPUT_TOO_LARGE`
+
+These are expected native job outcomes. `ECANCELLED` confirms the cooperative
+cancel request reached a queued or active job. The two limit codes identify
+which configured native boundary was exceeded. Use a fresh destination before
+retrying; a failed job does not commit a partial output.
+
 ## Worker failed to load
 
 Confirm the bundler emits module-worker assets and that the deployed server
@@ -78,9 +86,10 @@ remove any partial output owned by that operation.
 
 ## High memory use
 
-The algorithm and adapters operate on complete in-memory buffers. Add a size
-check before calling the library and avoid accepting arbitrary large untrusted
-files. Web execution is off-main-thread but still consumes the tab's memory.
+The algorithm and adapters operate on complete in-memory buffers. Use native job
+limits or add an application check before calling the legacy API, and avoid
+accepting arbitrary large untrusted files. Web execution is off-main-thread but
+still consumes the tab's memory.
 
 Unsignalled Web operations queue through a shared Worker. Signalled operations
 use dedicated Workers for isolated cancellation. Debounce repeated user actions

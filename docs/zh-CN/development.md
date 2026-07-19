@@ -2,7 +2,7 @@
 
 ## 前置条件
 
-- Node.js 18 或更高版本。
+- Node.js 20.19.4 或更高版本（CI 使用 Node 22）。
 - 通过仓库检入版本使用 Yarn 3.6.1。
 - Android 开发需要 Android Studio / JDK 17。
 - iOS 开发需要 Xcode 和 CocoaPods。
@@ -23,6 +23,7 @@ yarn prepare
 yarn typecheck
 yarn lint
 yarn test --runInBand
+yarn test:native-operations
 ```
 
 ## Web 门禁
@@ -44,17 +45,21 @@ yarn test:package
 
 ```sh
 FUZZ_RUNS=2000 yarn test:fuzz
+scripts/test-rn-android-compatibility.sh 0.73.11 old
 scripts/test-rn-android-compatibility.sh 0.73.11 new
 scripts/test-rn-android-compatibility.sh 0.74.7 new
 scripts/test-rn-android-compatibility.sh 0.86.0 new
-scripts/test-rn-ios-compatibility.sh 0.73.11
-scripts/test-rn-ios-compatibility.sh 0.74.7
-scripts/test-rn-ios-compatibility.sh 0.86.0
+scripts/test-rn-ios-compatibility.sh 0.73.11 old
+scripts/test-rn-ios-compatibility.sh 0.73.11 new
+scripts/test-rn-ios-compatibility.sh 0.74.7 new
+scripts/test-rn-ios-compatibility.sh 0.86.0 new
 ```
 
 本地 Clang runtime 支持时，fuzz 门禁使用 libFuzzer、AddressSanitizer 与
 UndefinedBehaviorSanitizer；否则运行确定性 sanitizer 语料。兼容 fixture 会使用所选
 React Native artifact 直接编译真实 Android 模块源码，不依赖源码文本断言。
+`test:native-operations` 会确定性覆盖 job 进度、取消、限制、畸形补丁、原子目标行为
+和临时文件清理。
 
 可复现的 Web 性能基准命令：
 
@@ -75,10 +80,14 @@ CI，不是发版门禁。可用 `yarn test:registry:vite` 和 `yarn test:regist
 Dependabot 会把常规 npm、Ruby 与 Actions 更新分组，控制评审数量；对于 API 兼容
 的叶子依赖，锁文件会直接固定到已修复版本。
 
-旧版开发工具链目前仍有三类仅开发期使用、不能安全强制升级的传递依赖：
-`fast-xml-parser` 的修复版本超出 CLI 12 的 major 范围，`tar` 的修复版本超出父依赖
-的 major 范围，而 `ip` 的一个告警尚无已修复版本。它们应继续保留在 GitHub alerts
-中；待 0.73 示例与 Jest 工具链退役，或父依赖提供兼容升级后移除。
+```sh
+yarn npm audit --all --recursive
+```
+
+示例与根工具链已升级到 React Native 0.86、CLI 20.2 与 release-it 20。升级后有
+漏洞的 `tmp`、`ip` 链已不再安装；锁文件固定了已修复的 `tar`、
+`fast-xml-parser`、`socks` 以及审计指出且 API 兼容的叶子覆盖。依赖变更后仍应
+检查 GitHub Dependabot alerts，不能只根据 lockfile override 推断告警已经关闭。
 
 ## 站点与文档
 
@@ -106,11 +115,13 @@ yarn test:web:browser
 
 ## 原生验证
 
-Android CI 构建两种架构模式，使用 React Native 0.73.11、0.74.7 与 0.86.0
-直接编译新架构源码，并在模拟器矩阵执行新架构设备级往返测试。iOS CI 也针对三
-个 React Native 版本编译 Pod，再使用示例 Gemfile 锁定的 CocoaPods 版本测试旧
-架构和新架构。模拟器除跨平台 golden patch 与损坏补丁拒绝外，还会断言实际启用
-的架构模式。
+Android CI 编译旧架构边界与新架构源码，并在 pull request 中通过 RN 0.86 新架构
+运行 API 24、31 设备测试。iOS 会编译 Pod 兼容 fixture，并在 Simulator 运行
+RN 0.86 新架构；React Native 0.82 及以上已不再提供旧架构运行时。设备测试会断言
+实际架构、跨平台 golden patch、损坏补丁拒绝、job 进度、取消、限制和输出清理。
+
+`native-benchmark.yml` 属于手动与定时基础设施，只上传 Linux/macOS JSON 基线；
+共享 Runner 波动较大，因此不会阻塞 pull request。
 
 本地示例命令见仓库
 [CONTRIBUTING.md](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/CONTRIBUTING.md)。

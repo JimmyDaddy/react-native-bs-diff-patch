@@ -155,10 +155,16 @@ const homepage = await readFile(
 );
 assert.match(homepage, /id="playground"/);
 assert.match(homepage, /id="generate-patch"/);
+assert.match(homepage, /id="cancel-operation"/);
+assert.match(homepage, /id="max-input-bytes"/);
+assert.match(homepage, /id="max-output-bytes"/);
+assert.match(homepage, /startPatch/);
+assert.match(homepage, /EINPUT_TOO_LARGE/);
 assert.match(homepage, /id="evidence"/);
 assert.match(homepage, /RN 0\.73\.11/);
 assert.match(homepage, /RN 0\.86\.0/);
-assert.match(homepage, /111 KiB packed/);
+assert.match(homepage, /122 KiB packed/);
+assert.match(homepage, /452 KiB unpacked · 58 files/);
 assert.match(homepage, /30,697\.5 ms/);
 assert.match(homepage, /assets\/playground\.js/);
 

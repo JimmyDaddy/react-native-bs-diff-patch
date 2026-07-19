@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18 or newer.
+- Node.js 20.19.4 or newer (the repository uses Node 22 in CI).
 - Yarn 3.6.1 through the repository's checked-in Yarn release.
 - Android Studio/JDK 17 for Android work.
 - Xcode and CocoaPods for iOS work.
@@ -23,6 +23,7 @@ yarn prepare
 yarn typecheck
 yarn lint
 yarn test --runInBand
+yarn test:native-operations
 ```
 
 ## Web gates
@@ -45,12 +46,14 @@ yarn test:package
 
 ```sh
 FUZZ_RUNS=2000 yarn test:fuzz
+scripts/test-rn-android-compatibility.sh 0.73.11 old
 scripts/test-rn-android-compatibility.sh 0.73.11 new
 scripts/test-rn-android-compatibility.sh 0.74.7 new
 scripts/test-rn-android-compatibility.sh 0.86.0 new
-scripts/test-rn-ios-compatibility.sh 0.73.11
-scripts/test-rn-ios-compatibility.sh 0.74.7
-scripts/test-rn-ios-compatibility.sh 0.86.0
+scripts/test-rn-ios-compatibility.sh 0.73.11 old
+scripts/test-rn-ios-compatibility.sh 0.73.11 new
+scripts/test-rn-ios-compatibility.sh 0.74.7 new
+scripts/test-rn-ios-compatibility.sh 0.86.0 new
 ```
 
 The fuzz gate uses libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer
@@ -58,6 +61,8 @@ when the local Clang runtime provides it, otherwise it runs a deterministic
 sanitizer corpus. The compatibility fixture compiles the actual Android module
 sources against the selected React Native artifact instead of relying on
 source-pattern assertions.
+`test:native-operations` deterministically covers job progress, cancellation,
+limits, malformed patches, atomic destination behavior, and temporary cleanup.
 
 Run the repeatable Web performance baseline with:
 
@@ -80,13 +85,15 @@ are optional peers. Dependabot groups routine npm, Ruby, and Actions updates to
 keep review volume bounded. The lockfile also pins patched leaf versions where
 their APIs remain compatible.
 
-The legacy development toolchain currently retains three development-only
-transitive families that cannot be safely forced to their advertised fixes:
-`fast-xml-parser` requires a major upgrade outside CLI 12's range, `tar` requires
-a major upgrade outside its parents' ranges, and `ip` has an open advisory with
-no patched version. Keep these visible in GitHub alerts and remove them when the
-0.73 example and Jest toolchains are retired or their parents publish
-compatible upgrades.
+```sh
+yarn npm audit --all --recursive
+```
+
+The example and root toolchains track React Native 0.86, CLI 20.2, and
+release-it 20. The upgrades remove the vulnerable `tmp` and `ip` chains; the
+lockfile pins patched `tar`, `fast-xml-parser`, `socks`, and compatible leaf
+overrides reported by the audit. Recheck GitHub Dependabot alerts after
+dependency changes instead of assuming a lockfile override closes an advisory.
 
 ## Site and documentation
 
@@ -115,13 +122,17 @@ Commit the regenerated `web/bsdiffpatch.mjs` with the C source change.
 
 ## Native verification
 
-Android CI builds both architecture modes, directly compiles New Architecture
-sources against React Native 0.73.11, 0.74.7, and 0.86.0, and runs the New
-Architecture device round trip on its emulator matrix. iOS CI compiles the Pod
-against the same three React Native versions, then uses the CocoaPods version
-locked in the example Gemfile to test both legacy and New Architecture modes.
-The simulator asserts the active architecture in addition to cross-platform
-golden patches and malformed-patch rejection.
+Android CI compiles the legacy boundary and New Architecture sources, then runs
+the public API through RN 0.86 New Architecture on API 24 and 31 for pull
+requests. iOS compiles the Pod compatibility fixtures and runs RN 0.86 New
+Architecture on Simulator; React Native 0.82 and newer no longer provide a
+legacy runtime. Device tests assert the active architecture, cross-platform
+golden patches, malformed-patch rejection, job progress, cancellation, limits,
+and output cleanup.
+
+`native-benchmark.yml` is manual and scheduled infrastructure. It uploads
+Linux/macOS JSON baselines but is intentionally not a pull-request blocker
+because shared-runner performance is noisy.
 
 For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 

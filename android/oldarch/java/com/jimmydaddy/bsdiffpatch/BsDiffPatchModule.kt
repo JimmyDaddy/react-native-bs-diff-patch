@@ -9,45 +9,67 @@ import com.facebook.react.module.annotations.ReactModule
 @ReactModule(name = BsDiffPatchNative.NAME)
 class BsDiffPatchModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
-  private val taskRunner = BsDiffPatchTaskRunner()
+  private val support = BsDiffPatchModuleSupport(reactContext)
 
   override fun getName(): String = BsDiffPatchNative.NAME
 
   @ReactMethod
-  fun patch(oldFile: String?, newFile: String?, patchFile: String?, promise: Promise) {
-    execute(promise) {
-      BsDiffPatchNative.patch(
-        requireArgument(oldFile, "oldFile"),
-        requireArgument(newFile, "newFile"),
-        requireArgument(patchFile, "patchFile")
-      )
-    }
-  }
+  fun patch(oldFile: String, newFile: String, patchFile: String, promise: Promise) =
+    support.patch(oldFile, newFile, patchFile, promise)
 
   @ReactMethod
-  fun diff(oldFile: String?, newFile: String?, patchFile: String?, promise: Promise) {
-    execute(promise) {
-      BsDiffPatchNative.diff(
-        requireArgument(oldFile, "oldFile"),
-        requireArgument(newFile, "newFile"),
-        requireArgument(patchFile, "patchFile")
-      )
-    }
-  }
+  fun diff(oldFile: String, newFile: String, patchFile: String, promise: Promise) =
+    support.diff(oldFile, newFile, patchFile, promise)
 
-  private fun requireArgument(value: String?, fieldName: String): String {
-    if (value.isNullOrEmpty()) {
-      throw BsDiffPatchException("EINVAL", "$fieldName can not be null or empty")
-    }
-    return value
-  }
+  @ReactMethod
+  fun startPatch(
+    jobId: String,
+    oldFile: String,
+    newFile: String,
+    patchFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  ) = support.startPatch(
+    jobId,
+    oldFile,
+    newFile,
+    patchFile,
+    maxInputBytes,
+    maxOutputBytes,
+    promise
+  )
 
-  private fun execute(promise: Promise, block: () -> Int) {
-    taskRunner.execute(promise, block)
-  }
+  @ReactMethod
+  fun startDiff(
+    jobId: String,
+    oldFile: String,
+    newFile: String,
+    patchFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  ) = support.startDiff(
+    jobId,
+    oldFile,
+    newFile,
+    patchFile,
+    maxInputBytes,
+    maxOutputBytes,
+    promise
+  )
+
+  @ReactMethod
+  fun cancel(jobId: String, promise: Promise) = support.cancel(jobId, promise)
+
+  @ReactMethod
+  fun addListener(eventName: String) = support.addListener(eventName)
+
+  @ReactMethod
+  fun removeListeners(count: Double) = support.removeListeners(count)
 
   override fun invalidate() {
-    taskRunner.shutdown()
+    support.invalidate()
     super.invalidate()
   }
 }

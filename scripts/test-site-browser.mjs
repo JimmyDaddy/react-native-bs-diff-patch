@@ -96,6 +96,31 @@ try {
   assert.match(result.status || '', /verified byte-for-byte/);
   assert.equal(result.evidenceRows, 3);
 
+  await page.select('#max-input-bytes', '64');
+  await page.click('#generate-patch');
+  await page.waitForSelector('#playground-status[data-state="error"]');
+  assert.equal(
+    await page.$eval('#error-code', (element) => element.textContent),
+    'ERESOURCE'
+  );
+
+  await page.select('#max-input-bytes', '');
+  await page.$eval('#old-payload', (element) => {
+    element.value = 'a'.repeat(4 * 1024 * 1024);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.$eval('#new-payload', (element) => {
+    element.value = `${'a'.repeat(4 * 1024 * 1024 - 1)}b`;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.click('#generate-patch');
+  await page.waitForSelector('#cancel-operation:not([disabled])');
+  await page.click('#cancel-operation');
+  await page.waitForFunction(
+    () => document.querySelector('#error-code')?.textContent === 'EABORTED',
+    { timeout: 30_000 }
+  );
+
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await page.reload({ waitUntil: 'networkidle0' });
   const mobile = await page.evaluate(() => ({

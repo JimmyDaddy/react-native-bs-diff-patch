@@ -31,11 +31,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if __has_include(<bzlib.h>)
-#include <bzlib.h>
-#else
 #include "bzlib/bzlib.h"
-#endif
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -50,6 +46,8 @@ struct bsdiff_stream
 	void* (*malloc)(size_t size);
 	void (*free)(void* ptr);
 	int (*write)(struct bsdiff_stream* stream, const void* buffer, int size);
+	int (*is_cancelled)(struct bsdiff_stream* stream);
+	void (*progress)(struct bsdiff_stream* stream, double progress);
 };
 
 int bsdiff(const uint8_t* oldBuf, int64_t oldsize, const uint8_t* newBuf, int64_t newsize, struct bsdiff_stream* stream);

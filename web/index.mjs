@@ -295,11 +295,11 @@ async function runWorker(operation, oldInput, input, options = {}) {
     : runSharedWorker(operation, oldFileData, inputFileData, options);
 }
 
-function rejectPathApi(methodName) {
+function rejectPathApi(methodName, webMethodName = `${methodName}Bytes`) {
   return Promise.reject(
     createError(
       'EUNSUPPORTED',
-      `${methodName} uses native file paths and is not available on Web; use ${methodName}Bytes instead`
+      `${methodName} uses native file paths and is not available on Web; use ${webMethodName} instead`
     )
   );
 }
@@ -318,4 +318,29 @@ export function diffBytes(oldData, newData, options) {
 
 export function patchBytes(oldData, patchData, options) {
   return runWorker('patch', oldData, patchData, options);
+}
+
+let unsupportedNativeJobId = 0;
+
+function unsupportedNativeJob(methodName) {
+  const id = `bsdiffpatch-web-unsupported-${++unsupportedNativeJobId}`;
+  return {
+    id,
+    result: rejectPathApi(
+      methodName,
+      methodName === 'startDiff' ? 'diffBytes' : 'patchBytes'
+    ),
+    async cancel() {},
+    onProgress() {
+      return () => {};
+    },
+  };
+}
+
+export function startDiff() {
+  return unsupportedNativeJob('startDiff');
+}
+
+export function startPatch() {
+  return unsupportedNativeJob('startPatch');
 }

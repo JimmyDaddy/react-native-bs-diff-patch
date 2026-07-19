@@ -14,8 +14,9 @@ all use the compatible `ENDSLEY/BSDIFF43` wire format.
 - **Both React Native architectures:** legacy bridge and TurboModule/New Architecture.
 - **Responsive by default:** native work uses dedicated serial queues; Web work
   reuses a module Worker and cached WebAssembly instance off the page thread.
-- **Bound untrusted Web work:** built-in cancellation and input/output byte
-  limits reject predictably with stable error codes.
+- **Control expensive work:** native jobs expose progress, cooperative
+  cancellation, input/output limits, and atomic output; Web uses
+  `AbortSignal` and binary limits.
 - **No Web service required:** the browser implementation is the same bundled C
   core compiled to WebAssembly.
 
@@ -73,6 +74,27 @@ Output paths must not exist, all paths in one call must be different, and the
 required input files must already exist. Both functions resolve to `0` on
 success.
 
+Use the job API when the operation needs progress, cancellation, or resource
+bounds:
+
+```ts
+import { startPatch } from 'react-native-bs-diff-patch';
+
+const job = startPatch(oldPath, outputPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+const unsubscribe = job.onProgress(({ phase, progress }) => {
+  renderProgress(phase, progress);
+});
+
+try {
+  await job.result;
+} finally {
+  unsubscribe();
+}
+```
+
 ## React Native Web quick start
 
 ```ts
@@ -108,9 +130,10 @@ with `EABORTED`; configured size limits reject with `ERESOURCE`.
 | ------------------------------------------ | ------- | --- | --- |
 | `diff(oldPath, newPath, patchPath)`        | Yes     | Yes | No  |
 | `patch(oldPath, outputPath, patchPath)`    | Yes     | Yes | No  |
+| `startDiff(...)` / `startPatch(...)`       | Yes     | Yes | No  |
 | `diffBytes(oldData, newData, options?)`    | No      | No  | Yes |
 | `patchBytes(oldData, patchData, options?)` | No      | No  | Yes |
-| Legacy architecture                        | Yes     | Yes | N/A |
+| Legacy architecture (when provided by RN)  | Yes     | Yes | N/A |
 | New Architecture / TurboModule             | Yes     | Yes | N/A |
 
 Calling an API family that is unavailable on the current platform rejects with
@@ -141,6 +164,7 @@ Native peers for Web-only consumers.
 - [Production recipes](./docs/recipes.md)
 - [Platform support](./docs/platform-support.md)
 - [Architecture and patch format](./docs/architecture.md)
+- [Controllable native operations](./docs/native-operations-v03.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Development and verification](./docs/development.md)
 

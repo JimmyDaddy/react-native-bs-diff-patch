@@ -7,38 +7,60 @@ import com.facebook.react.module.annotations.ReactModule
 @ReactModule(name = BsDiffPatchNative.NAME)
 class BsDiffPatchModule(reactContext: ReactApplicationContext) :
   NativeBsDiffPatchSpec(reactContext) {
-  private val taskRunner = BsDiffPatchTaskRunner()
+  private val support = BsDiffPatchModuleSupport(reactContext)
 
   override fun getName(): String = BsDiffPatchNative.NAME
 
-  override fun patch(
+  override fun patch(oldFile: String, newFile: String, patchFile: String, promise: Promise) =
+    support.patch(oldFile, newFile, patchFile, promise)
+
+  override fun diff(oldFile: String, newFile: String, patchFile: String, promise: Promise) =
+    support.diff(oldFile, newFile, patchFile, promise)
+
+  override fun startPatch(
+    jobId: String,
     oldFile: String,
     newFile: String,
     patchFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
     promise: Promise
-  ) {
-    execute(promise) {
-      BsDiffPatchNative.patch(oldFile, newFile, patchFile)
-    }
-  }
+  ) = support.startPatch(
+    jobId,
+    oldFile,
+    newFile,
+    patchFile,
+    maxInputBytes,
+    maxOutputBytes,
+    promise
+  )
 
-  override fun diff(
+  override fun startDiff(
+    jobId: String,
     oldFile: String,
     newFile: String,
     patchFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
     promise: Promise
-  ) {
-    execute(promise) {
-      BsDiffPatchNative.diff(oldFile, newFile, patchFile)
-    }
-  }
+  ) = support.startDiff(
+    jobId,
+    oldFile,
+    newFile,
+    patchFile,
+    maxInputBytes,
+    maxOutputBytes,
+    promise
+  )
 
-  private fun execute(promise: Promise, block: () -> Int) {
-    taskRunner.execute(promise, block)
-  }
+  override fun cancel(jobId: String, promise: Promise) = support.cancel(jobId, promise)
+
+  override fun addListener(eventName: String) = support.addListener(eventName)
+
+  override fun removeListeners(count: Double) = support.removeListeners(count)
 
   override fun invalidate() {
-    taskRunner.shutdown()
+    support.invalidate()
     super.invalidate()
   }
 }

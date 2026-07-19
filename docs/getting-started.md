@@ -23,7 +23,7 @@ native modules inside an already-installed binary.
 
 | Runtime      | Use                          | Do not use       |
 | ------------ | ---------------------------- | ---------------- |
-| Android, iOS | `diff` and `patch`           | Binary-data APIs |
+| Android, iOS | `diff`/`patch` or native jobs | Binary-data APIs |
 | Web          | `diffBytes` and `patchBytes` | File-path APIs   |
 
 The unavailable family rejects with `EUNSUPPORTED`, which helps catch imports
@@ -75,6 +75,38 @@ Before calling `patch`:
 Use a content hash or byte comparison from your filesystem layer to verify that
 `restoredPath` matches `newFilePath`. Clean the patch and restored file when
 they are no longer needed.
+
+## Add native progress, cancellation, and limits
+
+Use a job when the operation is user-controlled or processes untrusted input:
+
+```ts
+import { startPatch } from 'react-native-bs-diff-patch';
+
+const job = startPatch(oldFilePath, restoredPath, patchPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+
+const unsubscribe = job.onProgress(({ phase, progress }) => {
+  setOperationState({ phase, percent: Math.round(progress * 100) });
+});
+
+try {
+  await job.result;
+} catch (error) {
+  if ((error as { code?: string }).code !== 'ECANCELLED') throw error;
+} finally {
+  unsubscribe();
+}
+
+// Wire this to the screen's Cancel action while result is pending.
+cancelButton.onPress = () => void job.cancel();
+```
+
+`startDiff` accepts the same options. Native jobs write through a sibling
+temporary file, so cancellation or a limit failure does not expose a partial
+destination.
 
 ## Web binary workflow
 
@@ -138,5 +170,6 @@ but call it only after a browser `Worker` is available.
 
 - Copy a recovery pattern from [Production recipes](./recipes.md).
 - Review all signatures and error codes in the [API reference](./api-reference.md).
+- Review [controllable native operations](./native-operations-v03.md).
 - Check [platform and bundler support](./platform-support.md).
 - Try the [live Playground](https://bs-dff-patch.corerobin.com/#playground).

@@ -10,12 +10,20 @@ const newSize = document.querySelector('#new-size');
 const patchSize = document.querySelector('#patch-size');
 const transferSaved = document.querySelector('#transfer-saved');
 const runtimeMs = document.querySelector('#runtime-ms');
+const errorCode = document.querySelector('#error-code');
 const runtimeState = document.querySelector('#runtime-state');
 const status = document.querySelector('#playground-status');
 const generateButton = document.querySelector('#generate-patch');
 const downloadButton = document.querySelector('#download-patch');
+const cancelButton = document.querySelector('#cancel-operation');
+const maxInputBytes = document.querySelector('#max-input-bytes');
+const maxOutputBytes = document.querySelector('#max-output-bytes');
+const operationPhase = document.querySelector('#operation-phase');
+const operationPercent = document.querySelector('#operation-percent');
+const operationProgress = document.querySelector('#operation-progress');
 
 let currentPatch;
+let activeController;
 
 function formatBytes(bytes) {
   if (bytes < 1024) {
@@ -34,6 +42,17 @@ function setStatus(state, message) {
   status.lastChild.textContent = message;
 }
 
+function setProgress(phase, progress) {
+  operationPhase.textContent = phase;
+  operationPercent.value = `${Math.round(progress * 100)}%`;
+  operationProgress.value = progress;
+  operationProgress.textContent = operationPercent.value;
+}
+
+function selectedLimit(select) {
+  return select.value ? Number(select.value) : undefined;
+}
+
 function bytesEqual(left, right) {
   return (
     left.byteLength === right.byteLength &&
@@ -46,15 +65,25 @@ async function generatePatch() {
   const newData = encoder.encode(newPayload.value);
 
   generateButton.disabled = true;
+  cancelButton.disabled = false;
   downloadButton.disabled = true;
   generateButton.classList.add('is-running');
+  errorCode.textContent = '—';
+  activeController = new AbortController();
+  const options = {
+    signal: activeController.signal,
+    maxInputBytes: selectedLimit(maxInputBytes),
+    maxOutputBytes: selectedLimit(maxOutputBytes),
+  };
+  setProgress('Diffing', 0.2);
   setStatus('running', 'Generating patch in the Web Worker…');
 
   const startedAt = performance.now();
 
   try {
-    const patchData = await diffBytes(oldData, newData);
-    const restoredData = await patchBytes(oldData, patchData);
+    const patchData = await diffBytes(oldData, newData, options);
+    setProgress('Verifying', 0.65);
+    const restoredData = await patchBytes(oldData, patchData, options);
 
     if (!bytesEqual(restoredData, newData)) {
       throw new Error('The reconstructed payload did not match the target');
@@ -73,21 +102,40 @@ async function generatePatch() {
         : `${Math.abs(saved).toFixed(1)}% overhead`;
     transferSaved.classList.toggle('negative', saved < 0);
     runtimeMs.textContent = `${elapsed.toFixed(2)} ms`;
+    errorCode.textContent = '—';
     downloadButton.disabled = false;
+    setProgress('Complete', 1);
     setStatus('success', 'Round trip verified byte-for-byte');
   } catch (error) {
     currentPatch = undefined;
     patchSize.textContent = '—';
     transferSaved.textContent = '—';
     runtimeMs.textContent = '—';
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? String(error.code)
+        : 'EUNKNOWN';
+    errorCode.textContent = code;
+    setProgress(code === 'EABORTED' ? 'Cancelled' : 'Rejected', 0);
     setStatus(
       'error',
-      error instanceof Error ? error.message : 'The patch operation failed'
+      error instanceof Error
+        ? `[${code}] ${error.message}`
+        : `[${code}] The patch operation failed`
     );
   } finally {
+    activeController = undefined;
     generateButton.disabled = false;
+    cancelButton.disabled = true;
     generateButton.classList.remove('is-running');
   }
+}
+
+function cancelOperation() {
+  if (!activeController) return;
+  activeController.abort();
+  cancelButton.disabled = true;
+  setStatus('running', 'Cancellation requested…');
 }
 
 function downloadPatch() {
@@ -108,6 +156,7 @@ function downloadPatch() {
 oldPayload.addEventListener('input', updateInputSizes);
 newPayload.addEventListener('input', updateInputSizes);
 generateButton.addEventListener('click', generatePatch);
+cancelButton.addEventListener('click', cancelOperation);
 downloadButton.addEventListener('click', downloadPatch);
 
 updateInputSizes();

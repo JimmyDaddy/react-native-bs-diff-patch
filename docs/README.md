@@ -23,7 +23,7 @@ The [Chinese documentation](./zh-CN/README.md) mirrors the same public guides.
 - [Production recipes](./recipes.md) — integrity, cleanup, downloads, and cross-runtime workflows.
 - [Platform support](./platform-support.md) — architecture and bundler behavior.
 - [Architecture](./architecture.md) — execution paths and patch compatibility.
-- [Native operations 0.3](./native-operations-v03.md) — resource limits,
+- [Controllable native operations](./native-operations-v03.md) — resource limits,
   cancellation, progress, and atomic output contract.
 - [Troubleshooting](./troubleshooting.md) — common integration failures.
 - [Development](./development.md) — local builds, tests, WebAssembly, and release checks.

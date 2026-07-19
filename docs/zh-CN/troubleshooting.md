@@ -8,6 +8,7 @@
 | `ENOENT`、`EEXIST`、`EINVAL`  | 在原生任务开始前检查路径状态    |
 | `EUNSUPPORTED`                | 确认选择了当前平台对应的 API 族 |
 | `EABORTED`、`ERESOURCE`       | 检查 Web 取消与配置的字节上限   |
+| `ECANCELLED`、原生限制错误码  | 检查原生 job 取消与配置边界     |
 | `EDIFF`、`EPATCH`             | 检查原生 I/O 与补丁完整性       |
 | Worker 或 `EWEBASSEMBLY` 失败 | 检查 Web 资源、CSP 和补丁 magic |
 | 内存占用过高                  | 设置输入大小和并发限制          |
@@ -50,6 +51,12 @@
 `ERESOURCE` 表示输入、生成补丁或补丁声明的还原输出超过配置的字节上限。二者是预期
 控制流错误，并不表示 WebAssembly 损坏。
 
+## `ECANCELLED`、`EINPUT_TOO_LARGE` 或 `EOUTPUT_TOO_LARGE`
+
+这些是原生 job 的预期结果。`ECANCELLED` 表示排队中或运行中的任务已经收到协作式
+取消；两个限制错误码用于区分命中的原生边界。重试前使用新的目标路径；失败 job 不会
+提交半成品输出。
+
 ## Worker 加载失败
 
 确认打包器输出了模块 Worker 资源，并且服务器将 `.mjs` 作为 JavaScript 提供。
@@ -69,8 +76,8 @@
 
 ## 内存占用过高
 
-算法和适配器处理完整内存缓冲区。调用前添加大小限制，不要接受任意大的不可信文件。
-Web 虽在主线程外执行，仍会消耗当前标签页内存。
+算法和适配器处理完整内存缓冲区。使用原生 job 限制，或在调用旧 API 前自行检查，
+不要接受任意大的不可信文件。Web 虽在主线程外执行，仍会消耗当前标签页内存。
 
 不带 signal 的 Web 操作在共享 Worker 中排队；带 signal 的操作使用专用 Worker，
 以实现隔离取消。对重复用户操作进行防抖；大任务可能重叠时设置应用级预算。
