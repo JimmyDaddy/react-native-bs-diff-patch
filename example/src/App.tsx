@@ -7,6 +7,11 @@ import * as FS from 'react-native-fs';
 import crossPlatformFixture from '../../fixtures/cross-platform.json';
 
 export default function App() {
+  const architecture = (
+    globalThis as typeof globalThis & { nativeFabricUIManager?: unknown }
+  ).nativeFabricUIManager
+    ? 'new'
+    : 'old';
   const newFile = FS.DocumentDirectoryPath + '/test1.txt';
   const oldFile = FS.DocumentDirectoryPath + '/test.txt';
   const patchFile = FS.DocumentDirectoryPath + '/patch.txt';
@@ -174,6 +179,7 @@ export default function App() {
     <View style={styles.container}>
       <Text>Text: {textLength}</Text>
       <Text>Patch: {patchFileUri}</Text>
+      <Text testID="architecture-status">Architecture: {architecture}</Text>
       <Text testID="runtime-status">Runtime: {runtimeStatus}</Text>
     </View>
   );

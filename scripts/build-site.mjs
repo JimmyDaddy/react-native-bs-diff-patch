@@ -45,6 +45,13 @@ const pages = [
     file: 'architecture.md',
   },
   {
+    slug: 'native-operations-v03',
+    title: 'Native operations 0.3',
+    description:
+      'Planned resource limits, cancellation, progress, and atomic output contract.',
+    file: 'native-operations-v03.md',
+  },
+  {
     slug: 'troubleshooting',
     title: 'Troubleshooting',
     description:
@@ -90,6 +97,12 @@ const chinesePages = [
     title: '架构',
     description: '执行边界、共用 C 核心、WebAssembly 打包与补丁兼容性。',
     file: 'architecture.md',
+  },
+  {
+    slug: 'native-operations-v03',
+    title: '0.3 原生操作',
+    description: '规划中的资源限制、取消、进度与原子输出约定。',
+    file: 'native-operations-v03.md',
   },
   {
     slug: 'troubleshooting',

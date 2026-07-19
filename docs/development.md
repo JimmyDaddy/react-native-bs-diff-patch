@@ -48,6 +48,9 @@ FUZZ_RUNS=2000 yarn test:fuzz
 scripts/test-rn-android-compatibility.sh 0.73.11 new
 scripts/test-rn-android-compatibility.sh 0.74.7 new
 scripts/test-rn-android-compatibility.sh 0.86.0 new
+scripts/test-rn-ios-compatibility.sh 0.73.11
+scripts/test-rn-ios-compatibility.sh 0.74.7
+scripts/test-rn-ios-compatibility.sh 0.86.0
 ```
 
 The fuzz gate uses libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer
@@ -61,7 +64,29 @@ Run the repeatable Web performance baseline with:
 ```sh
 yarn benchmark:web
 BENCHMARK_OUTPUT=/tmp/web-wasm.json yarn benchmark:web
+yarn benchmark:native
+BENCHMARK_OUTPUT=/tmp/native-core.json yarn benchmark:native
 ```
+
+The published-package canaries install directly from npm and intentionally use
+current Vite and Expo toolchains. They are scheduled CI checks, not release
+gates. Run them on demand with `yarn test:registry:vite` and
+`yarn test:registry:expo`; set `PACKAGE_SPEC` to validate a tag or tarball.
+
+## Dependency security
+
+The published package has no runtime npm dependencies; React and React Native
+are optional peers. Dependabot groups routine npm, Ruby, and Actions updates to
+keep review volume bounded. The lockfile also pins patched leaf versions where
+their APIs remain compatible.
+
+The legacy development toolchain currently retains three development-only
+transitive families that cannot be safely forced to their advertised fixes:
+`fast-xml-parser` requires a major upgrade outside CLI 12's range, `tar` requires
+a major upgrade outside its parents' ranges, and `ip` has an open advisory with
+no patched version. Keep these visible in GitHub alerts and remove them when the
+0.73 example and Jest toolchains are retired or their parents publish
+compatible upgrades.
 
 ## Site and documentation
 
@@ -92,10 +117,11 @@ Commit the regenerated `web/bsdiffpatch.mjs` with the C source change.
 
 Android CI builds both architecture modes, directly compiles New Architecture
 sources against React Native 0.73.11, 0.74.7, and 0.86.0, and runs the New
-Architecture device round trip on its emulator matrix. iOS CI uses the CocoaPods
-version locked in the example Gemfile to build and test both legacy and New
-Architecture modes. Device tests include cross-platform golden patches and
-malformed-patch rejection.
+Architecture device round trip on its emulator matrix. iOS CI compiles the Pod
+against the same three React Native versions, then uses the CocoaPods version
+locked in the example Gemfile to test both legacy and New Architecture modes.
+The simulator asserts the active architecture in addition to cross-platform
+golden patches and malformed-patch rejection.
 
 For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 

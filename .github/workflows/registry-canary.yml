@@ -1,0 +1,43 @@
+name: Registry Consumer Canary
+
+on:
+  schedule:
+    - cron: '41 4 * * 3'
+  workflow_dispatch:
+    inputs:
+      package_spec:
+        description: npm package spec to validate
+        required: false
+        default: react-native-bs-diff-patch@latest
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry-canary
+  cancel-in-progress: true
+
+jobs:
+  consumer:
+    name: ${{ matrix.consumer }} consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        consumer: [vite, expo]
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - name: Test published package consumer
+        env:
+          PACKAGE_SPEC: ${{ inputs.package_spec || 'react-native-bs-diff-patch@latest' }}
+        run: node scripts/test-registry-consumers.mjs ${{ matrix.consumer }}
