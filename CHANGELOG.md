@@ -1,3 +1,12 @@
+
+
+# [0.2.0](https://github.com/JimmyDaddy/react-native-bs-diff-patch/compare/v0.1.0...v0.2.0) (2026-07-19)
+
+
+### Features
+
+* harden cross-platform package and runtime ([#28](https://github.com/JimmyDaddy/react-native-bs-diff-patch/issues/28)) ([23dc872](https://github.com/JimmyDaddy/react-native-bs-diff-patch/commit/23dc872756f9583ada5e915f01c5600fc1f0ffce))
+
 # Changelog
 
 All notable changes to this project are documented in this file. Releases use

@@ -1,6 +1,6 @@
 {
   "name": "react-native-bs-diff-patch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Binary diff and patch support for React Native and React Native Web",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
