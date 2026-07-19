@@ -377,7 +377,7 @@ jobs:
     name: iOS RN API Compatibility (${{ matrix.react-native }})
     needs: changes
     if: needs.changes.outputs.ios == 'true'
-    runs-on: macos-14
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: true
@@ -386,10 +386,13 @@ jobs:
         include:
           - react-native: '0.73.11'
             node: '18'
+            runner: macos-14
           - react-native: '0.74.7'
             node: '18'
+            runner: macos-14
           - react-native: '0.86.0'
             node: '22'
+            runner: macos-15
     steps:
       - name: Checkout the code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
