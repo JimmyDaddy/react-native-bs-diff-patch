@@ -1,0 +1,44 @@
+name: Native Core Benchmark
+
+on:
+  schedule:
+    - cron: '23 5 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-core-benchmark
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Native core (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Run deterministic benchmark
+        env:
+          BENCHMARK_OUTPUT: native-core-${{ runner.os }}.json
+        run: node scripts/benchmark-native.mjs
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-core-${{ runner.os }}
+          path: native-core-${{ runner.os }}.json
+          if-no-files-found: error
+          retention-days: 30

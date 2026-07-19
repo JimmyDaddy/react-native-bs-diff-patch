@@ -39,6 +39,7 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
+    "!cpp/benchmark",
     "!cpp/fuzz",
     "!**/.*"
   ],
@@ -49,8 +50,11 @@
     "test:web:browser": "node scripts/test-web-browser.mjs",
     "test:web:metro": "node scripts/test-web-metro.mjs",
     "test:package": "node scripts/test-package-consumers.mjs",
+    "test:registry:vite": "node scripts/test-registry-consumers.mjs vite",
+    "test:registry:expo": "node scripts/test-registry-consumers.mjs expo",
     "test:fuzz": "sh scripts/test-native-fuzz.sh",
     "benchmark:web": "node scripts/benchmark-web.mjs",
+    "benchmark:native": "node scripts/benchmark-native.mjs",
     "site:build": "node scripts/build-site.mjs",
     "site:test": "node scripts/test-site.mjs",
     "site:test:browser": "node scripts/test-site-browser.mjs",
@@ -86,7 +90,7 @@
     "@commitlint/config-conventional": "^17.0.2",
     "@evilmartians/lefthook": "^1.5.0",
     "@react-native/eslint-config": "^0.72.2",
-    "@release-it/conventional-changelog": "^5.0.0",
+    "@release-it/conventional-changelog": "^8.0.2",
     "@types/jest": "^28.1.2",
     "@types/react": "~17.0.21",
     "@types/react-native": "0.70.0",
@@ -102,12 +106,15 @@
     "react": "18.2.0",
     "react-native": "0.73.2",
     "react-native-builder-bob": "^0.20.0",
-    "release-it": "^15.0.0",
-    "turbo": "^1.10.7",
+    "release-it": "^17.11.0",
+    "turbo": "^2.10.5",
     "typescript": "^5.0.2"
   },
   "resolutions": {
-    "@types/react": "17.0.21"
+    "@types/react": "17.0.21",
+    "lodash": "4.18.1",
+    "on-headers": "1.1.0",
+    "tmp": "0.2.6"
   },
   "peerDependencies": {
     "react": "*",

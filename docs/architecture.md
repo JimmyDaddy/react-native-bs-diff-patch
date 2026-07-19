@@ -87,12 +87,32 @@ toolchain version materially affect results. The full machine-readable record
 is in
 [`benchmarks/web-wasm.json`](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/benchmarks/web-wasm.json).
 
+## Reference native-core benchmark
+
+`yarn benchmark:native` compiles the same C sources embedded by Android and iOS,
+runs each size in a fresh process, verifies the restored file, and records peak
+resident memory. On the same Apple M3 Pro, the checked-in reference recorded:
+
+| Input  | Diff        | Patch    | Patch bytes | Peak RSS  |
+| ------ | ----------- | -------- | ----------- | --------- |
+| 1 MiB  | 149.7 ms    | 4.8 ms   | 110         | 21.1 MiB  |
+| 10 MiB | 4,103.3 ms  | 34.3 ms  | 118         | 193.6 MiB |
+| 50 MiB | 31,852.3 ms | 199.7 ms | 203         | 960.4 MiB |
+
+This isolates the native core from React Native scheduling and filesystem
+wrappers; it is not an Android or iOS device score. Scheduled Linux and macOS
+runs publish reports as CI artifacts so regressions can be compared on the same
+runner family. The checked-in record is
+[`benchmarks/native-core.json`](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/benchmarks/native-core.json).
+
 ## Memory model
 
 Native operations read the old and target files into process memory. Web calls
 copy inputs before transferring them to a Worker, then copy results out of
 MEMFS. Peak memory can therefore be several times larger than the input or
-output size.
+output size. The native reference reaches roughly nineteen times the input size
+for this highly similar 50 MiB fixture, primarily because of the suffix array
+and simultaneous file buffers.
 
 For very large updates, enforce an application limit before calling the
 library, and consider a server-side or streaming update strategy when the full

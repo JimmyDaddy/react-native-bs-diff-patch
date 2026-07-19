@@ -6,8 +6,17 @@
 
 #define TIMEOUT_SECONDS 120
 #define RUNTIME_STATUS_ID @"runtime-status"
+#define ARCHITECTURE_STATUS_ID @"architecture-status"
 #define SUCCESS_STATUS @"Runtime: success"
 #define ERROR_STATUS_PREFIX @"Runtime: error:"
+#ifndef EXPECTED_NEW_ARCH
+#error "EXPECTED_NEW_ARCH must be provided by the iOS runtime test"
+#endif
+#if EXPECTED_NEW_ARCH
+#define EXPECTED_ARCHITECTURE @"new"
+#else
+#define EXPECTED_ARCHITECTURE @"old"
+#endif
 
 @interface BsDiffPatchExampleTests : XCTestCase
 
@@ -33,6 +42,7 @@
   UIViewController *vc = [[[RCTSharedApplication() delegate] window] rootViewController];
   NSDate *date = [NSDate dateWithTimeIntervalSinceNow:TIMEOUT_SECONDS];
   __block NSString *runtimeStatus = nil;
+  __block NSString *architectureStatus = nil;
 
   __block NSString *redboxError = nil;
 #ifdef DEBUG
@@ -58,6 +68,9 @@
                          return YES;
                        }
                      }
+                     if ([view.accessibilityIdentifier isEqualToString:ARCHITECTURE_STATUS_ID]) {
+                       architectureStatus = view.accessibilityLabel;
+                     }
                      return NO;
                    }];
   }
@@ -71,6 +84,14 @@
                         SUCCESS_STATUS,
                         @"Expected a successful native diff/patch round trip, got '%@'",
                         runtimeStatus);
+
+  NSString *expectedArchitectureStatus =
+      [NSString stringWithFormat:@"Architecture: %@", EXPECTED_ARCHITECTURE];
+  XCTAssertEqualObjects(architectureStatus,
+                        expectedArchitectureStatus,
+                        @"Expected the %@ architecture runtime, got '%@'",
+                        EXPECTED_ARCHITECTURE,
+                        architectureStatus);
 }
 
 @end

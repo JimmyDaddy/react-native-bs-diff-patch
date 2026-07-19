@@ -852,7 +852,7 @@ PODS:
   - React-Mapbuffer (0.73.2):
     - glog
     - React-debug
-  - react-native-bs-diff-patch (0.0.2):
+  - react-native-bs-diff-patch (0.2.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
@@ -1210,7 +1210,7 @@ SPEC CHECKSUMS:
   React-jsinspector: 03644c063fc3621c9a4e8bf263a8150909129618
   React-logger: b42a493ae72922d8d6a497038359240ffd457119
   React-Mapbuffer: 2cd1af67c3754dfb934948448125f0e051586db7
-  react-native-bs-diff-patch: c082b14fa87d60df5e29d33ac8a3edb1d6d4d971
+  react-native-bs-diff-patch: c053bbc33ece9b98a38292e413ab5829687c10b4
   React-nativeconfig: d753fbbc8cecc8ae413d615599ac378bbf6999bb
   React-NativeModulesApple: 0c22e17930a2de06bbd4d49a149351a5151283dc
   React-perflogger: 29efe63b7ef5fbaaa50ef6eaa92482f98a24b97e
@@ -1237,4 +1237,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 4abad8f5d0039c55400fe3dc57af4b12719ceb23
 
-COCOAPODS: 1.14.3
+COCOAPODS: 1.17.0
