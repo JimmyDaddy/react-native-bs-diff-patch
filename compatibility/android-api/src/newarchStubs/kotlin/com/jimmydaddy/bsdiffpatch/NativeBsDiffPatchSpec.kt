@@ -20,4 +20,30 @@ abstract class NativeBsDiffPatchSpec(
     patchFile: String,
     promise: Promise
   )
+
+  abstract fun startPatch(
+    jobId: String,
+    oldFile: String,
+    newFile: String,
+    patchFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  )
+
+  abstract fun startDiff(
+    jobId: String,
+    oldFile: String,
+    newFile: String,
+    patchFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  )
+
+  abstract fun cancel(jobId: String, promise: Promise)
+
+  abstract fun addListener(eventName: String)
+
+  abstract fun removeListeners(count: Double)
 }

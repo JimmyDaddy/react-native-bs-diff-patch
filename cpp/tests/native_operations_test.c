@@ -1,7 +1,11 @@
 #ifdef __APPLE__
+#ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE
+#endif
 #else
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#endif
 #endif
 
 #include "bsdiffpatch_operation.h"
