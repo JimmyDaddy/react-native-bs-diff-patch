@@ -21,7 +21,13 @@ if "$compiler" \
   -I"$repository_directory/cpp" \
   "$repository_directory/cpp/bspatch.c" \
   "$repository_directory/cpp/fuzz/bspatch_fuzzer.c" \
-  -lbz2 \
+  "$repository_directory/cpp/bzlib/blocksort.c" \
+  "$repository_directory/cpp/bzlib/bzlib.c" \
+  "$repository_directory/cpp/bzlib/compress.c" \
+  "$repository_directory/cpp/bzlib/crctable.c" \
+  "$repository_directory/cpp/bzlib/decompress.c" \
+  "$repository_directory/cpp/bzlib/huffman.c" \
+  "$repository_directory/cpp/bzlib/randtable.c" \
   -o "$temporary_directory/bspatch-fuzzer" 2>/dev/null; then
   "$temporary_directory/bspatch-fuzzer" \
     -runs="$fuzz_runs" \
@@ -38,7 +44,13 @@ else
     -I"$repository_directory/cpp" \
     "$repository_directory/cpp/bspatch.c" \
     "$repository_directory/cpp/fuzz/bspatch_fuzzer.c" \
-    -lbz2 \
+    "$repository_directory/cpp/bzlib/blocksort.c" \
+    "$repository_directory/cpp/bzlib/bzlib.c" \
+    "$repository_directory/cpp/bzlib/compress.c" \
+    "$repository_directory/cpp/bzlib/crctable.c" \
+    "$repository_directory/cpp/bzlib/decompress.c" \
+    "$repository_directory/cpp/bzlib/huffman.c" \
+    "$repository_directory/cpp/bzlib/randtable.c" \
     -o "$temporary_directory/bspatch-fuzzer"
   "$temporary_directory/bspatch-fuzzer" "$fuzz_runs"
 fi
