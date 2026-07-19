@@ -4,7 +4,8 @@
 
 - Node.js 20.19.4 or newer (the repository uses Node 22 in CI).
 - Yarn 3.6.1 through the repository's checked-in Yarn release.
-- Android Studio/JDK 17 for Android work.
+- Android Studio/JDK 17 for Android work; the RN 0.73/0.74 compatibility fixture
+  intentionally uses Gradle 8.3 (`GRADLE_EXECUTABLE` can select it locally).
 - Xcode and CocoaPods for iOS work.
 - Emscripten only when regenerating the checked-in WebAssembly bundle.
 

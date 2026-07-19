@@ -4,7 +4,8 @@
 
 - Node.js 20.19.4 或更高版本（CI 使用 Node 22）。
 - 通过仓库检入版本使用 Yarn 3.6.1。
-- Android 开发需要 Android Studio / JDK 17。
+- Android 开发需要 Android Studio / JDK 17；RN 0.73/0.74 兼容 fixture 固定使用
+  Gradle 8.3（本地可通过 `GRADLE_EXECUTABLE` 指定）。
 - iOS 开发需要 Xcode 和 CocoaPods。
 - 只有重新生成已检入 WebAssembly bundle 时才需要 Emscripten。
 

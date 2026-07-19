@@ -5,7 +5,8 @@ repository_directory=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 temporary_directory=$(mktemp -d)
 trap 'rm -rf "$temporary_directory"' EXIT INT TERM
 
-cc -std=c11 -O2 -Wall -Wextra -Werror -Wno-unused-parameter \
+cc -std=c11 -O2 -Wall -Wextra -Werror -Wno-implicit-fallthrough \
+  -Wno-unused-parameter \
   -I "$repository_directory/cpp" \
   "$repository_directory/cpp/tests/native_operations_test.c" \
   "$repository_directory/cpp/bsdiff.c" \
