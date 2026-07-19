@@ -724,6 +724,37 @@ static int create_sibling_temp(const char *destination, char **temporaryPath)
     return fd;
 }
 
+static int reserve_and_rename_temp(
+    const char *temporaryPath,
+    const char *destination)
+{
+    int placeholderFd;
+    int savedErrno;
+
+    /* Android 7's kernel does not provide renameat2 and its SELinux policy
+     * rejects hard links in the app data directory. Reserve the destination
+     * name exclusively, then atomically replace our private placeholder. */
+    placeholderFd = open(destination, O_CREAT | O_EXCL | O_WRONLY, 0000);
+    if (placeholderFd < 0) {
+        if (errno == EEXIST)
+            return BS_OPERATION_DESTINATION_EXISTS;
+        return BS_OPERATION_ERROR;
+    }
+    if (close(placeholderFd) != 0) {
+        savedErrno = errno;
+        unlink(destination);
+        errno = savedErrno;
+        return BS_OPERATION_ERROR;
+    }
+    if (rename(temporaryPath, destination) == 0)
+        return BS_OPERATION_OK;
+
+    savedErrno = errno;
+    unlink(destination);
+    errno = savedErrno;
+    return BS_OPERATION_ERROR;
+}
+
 static int commit_sibling_temp(const char *temporaryPath, const char *destination)
 {
 #if defined(__APPLE__)
@@ -752,7 +783,7 @@ static int commit_sibling_temp(const char *temporaryPath, const char *destinatio
     if (link(temporaryPath, destination) != 0) {
         if (errno == EEXIST)
             return BS_OPERATION_DESTINATION_EXISTS;
-        return BS_OPERATION_ERROR;
+        return reserve_and_rename_temp(temporaryPath, destination);
     }
 
     /* The destination now names the fully-written inode. Removing the private
