@@ -82,8 +82,10 @@
                         @"Expected a successful native diff/patch round trip, got '%@'",
                         runtimeStatus);
 
+  NSString *expectedArchitectureStatus =
+      [NSString stringWithFormat:@"Architecture: %@", EXPECTED_ARCHITECTURE];
   XCTAssertEqualObjects(architectureStatus,
-                        [NSString stringWithFormat:@"Architecture: %@", EXPECTED_ARCHITECTURE],
+                        expectedArchitectureStatus,
                         @"Expected the %@ architecture runtime, got '%@'",
                         EXPECTED_ARCHITECTURE,
                         architectureStatus);

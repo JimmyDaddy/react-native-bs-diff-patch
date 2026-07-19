@@ -42,13 +42,30 @@ cp -R "$repository_directory/example/ios/BsDiffPatchExample" "$consumer_director
 cp "$repository_directory/compatibility/ios-api/Podfile" "$consumer_directory/ios/Podfile"
 cp "$repository_directory/compatibility/ios-api/package.json" "$consumer_directory/package.json"
 
+package_tarball_name=$(node -e '
+  const packageJson = require(process.argv[1]);
+  const packageName = packageJson.name.replace(/^@/, "").replace(/\//g, "-");
+  process.stdout.write(`${packageName}-${packageJson.version}.tgz`);
+' "$repository_directory/package.json")
+package_tarball="$temporary_directory/$package_tarball_name"
+
+npm pack \
+  --ignore-scripts \
+  --pack-destination "$temporary_directory" \
+  "$repository_directory"
+
+if [ ! -f "$package_tarball" ]; then
+  echo "Expected npm package was not created: $package_tarball" >&2
+  exit 1
+fi
+
 npm install \
   --prefix "$consumer_directory" \
   --ignore-scripts \
   --no-audit \
   --no-fund \
   --save-exact \
-  "$repository_directory" \
+  "$package_tarball" \
   "react@$react_version" \
   "react-native@$react_native_version" \
   "@react-native-community/cli@$cli_version" \
