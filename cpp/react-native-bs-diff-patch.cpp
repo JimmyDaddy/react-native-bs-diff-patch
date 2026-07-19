@@ -31,4 +31,8 @@ namespace bsdiffpatch {
       const bs_operation_options* options) {
     return bsPatchFileWithOptions(oldFile, newFile, patchFile, options);
   }
+
+  const char* diffLastErrorStage() {
+    return bsDiffLastErrorStage();
+  }
 }

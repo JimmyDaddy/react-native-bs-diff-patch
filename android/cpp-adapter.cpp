@@ -1,7 +1,10 @@
 #include <jni.h>
+#include <android/log.h>
 
 #include <atomic>
+#include <cerrno>
 #include <chrono>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -134,10 +137,22 @@ Java_com_jimmydaddy_bsdiffpatch_BsDiffPatchNative_bsDiffFile(
     jstring oldFile,
     jstring newFile,
     jstring patchFile) {
-    return static_cast<jint>(bsdiffpatch::diffFile(
+    jint result = static_cast<jint>(bsdiffpatch::diffFile(
         javaString(env, oldFile).c_str(),
         javaString(env, newFile).c_str(),
         javaString(env, patchFile).c_str()));
+    if (result != BS_OPERATION_OK) {
+        const char *stage = bsdiffpatch::diffLastErrorStage();
+        __android_log_print(
+            ANDROID_LOG_ERROR,
+            "BsDiffPatch",
+            "diff failed at %s: result=%d errno=%d (%s)",
+            stage == nullptr ? "unknown" : stage,
+            result,
+            errno,
+            std::strerror(errno));
+    }
+    return result;
 }
 
 extern "C" JNIEXPORT jint JNICALL

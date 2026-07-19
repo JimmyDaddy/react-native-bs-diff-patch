@@ -46,6 +46,13 @@
 #define MIN(x,y) (((x)<(y)) ? (x) : (y))
 #define BSDIFF_IO_CHUNK (64 * 1024)
 
+static __thread const char *bsdiffLastErrorStage = NULL;
+
+const char *bsDiffLastErrorStage(void)
+{
+	return bsdiffLastErrorStage;
+}
+
 static int bsdiff_cancelled(struct bsdiff_stream *stream)
 {
 	return stream->is_cancelled != NULL && stream->is_cancelled(stream);
@@ -543,6 +550,7 @@ static int bsDiffFileInternal(
     struct bsdiff_stream stream;
     BZFILE *bz2 = NULL;
     struct bsdiff_file_stream_context context;
+    const char *errorStage = "validate";
 
     memset(&stream, 0, sizeof(stream));
     memset(&context, 0, sizeof(context));
@@ -564,6 +572,7 @@ static int bsDiffFileInternal(
     }
 
     operation_progress(options, BS_OPERATION_READING, 0.0);
+    errorStage = "read-old";
     fd = open(oldFile, O_RDONLY, 0);
     if (fd < 0)
         goto cleanup;
@@ -587,6 +596,7 @@ static int bsDiffFileInternal(
         goto cleanup;
     operation_progress(options, BS_OPERATION_READING, 0.075);
 
+    errorStage = "read-new";
     fd = open(newFile, O_RDONLY, 0);
     if (fd < 0)
         goto cleanup;
@@ -616,6 +626,7 @@ static int bsDiffFileInternal(
         goto cleanup;
     }
 
+    errorStage = "open-output";
     fd = outputFd >= 0 ? outputFd : open(patchFile, O_CREAT|O_EXCL|O_WRONLY, 0666);
     outputFd = -1;
     if (fd < 0) {
@@ -629,22 +640,26 @@ static int bsDiffFileInternal(
     fd = -1;
     context.file = pf;
 
+    errorStage = "write-header";
     offtout(newsize, buf);
     if (fwrite("ENDSLEY/BSDIFF43", 16, 1, pf) != 1 ||
         fwrite(buf, sizeof(buf), 1, pf) != 1)
         goto cleanup;
 
+    errorStage = "open-compressor";
     bz2 = BZ2_bzWriteOpen(&bz2err, pf, 9, 0, 0);
     if (bz2 == NULL || bz2err != BZ_OK)
         goto cleanup;
     context.bz2 = bz2;
 
+    errorStage = "generate-diff";
     if (bsdiff(old, oldsize, new, newsize, &stream)) {
         result = context.result;
         if (operation_cancelled(options)) result = BS_OPERATION_CANCELLED;
         goto cleanup;
     }
 
+    errorStage = "close-compressor";
     BZ2_bzWriteClose(&bz2err, bz2, 0, NULL, NULL);
     bz2 = NULL;
     context.bz2 = NULL;
@@ -662,8 +677,10 @@ static int bsDiffFileInternal(
         goto cleanup;
     }
     operation_progress(options, BS_OPERATION_WRITING, 0.95);
+    errorStage = "sync-output";
     if (options != NULL && (fflush(pf) != 0 || fsync(fileno(pf)) != 0))
         goto cleanup;
+    errorStage = "close-output";
     closeResult = fclose(pf);
     pf = NULL;
     if (closeResult != 0)
@@ -683,6 +700,7 @@ cleanup:
         unlink(patchFile);
     free(old);
     free(new);
+    bsdiffLastErrorStage = result == BS_OPERATION_OK ? NULL : errorStage;
     return result;
 }
 
@@ -781,6 +799,8 @@ int bsDiffFileWithOptions(
         unlink(temporaryPath);
     else
         operation_progress(options, BS_OPERATION_WRITING, 1.0);
+    if (result != BS_OPERATION_OK && bsdiffLastErrorStage == NULL)
+        bsdiffLastErrorStage = "commit-output";
     free(temporaryPath);
     return result;
 }

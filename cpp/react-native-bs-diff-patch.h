@@ -16,6 +16,7 @@ namespace bsdiffpatch {
       const char* newFile,
       const char* patchFile,
       const bs_operation_options* options);
+  const char* diffLastErrorStage();
 }
 
 #endif /* BSDIFFPATCH_H */

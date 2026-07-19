@@ -17,6 +17,9 @@ add_library(react-native-bs-diff-patch            SHARED
             cpp-adapter.cpp
 )
 
+find_library(log-lib log)
+target_link_libraries(react-native-bs-diff-patch ${log-lib})
+
 # Specifies a path to native header files.
 include_directories(
             ../cpp

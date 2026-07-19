@@ -52,5 +52,6 @@ struct bsdiff_stream
 
 int bsdiff(const uint8_t* oldBuf, int64_t oldsize, const uint8_t* newBuf, int64_t newsize, struct bsdiff_stream* stream);
 int bsDiffFile(const char* oldFile, const char* newFile, const char* patchFile);
+const char* bsDiffLastErrorStage(void);
 
 #endif
