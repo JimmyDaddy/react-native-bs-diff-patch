@@ -38,12 +38,57 @@ function run(command, args, options = {}) {
 }
 
 function parseTrailingJson(output) {
-  const start = output.startsWith('[') ? 0 : output.lastIndexOf('\n[') + 1;
-  if (start < 0 || output[start] !== '[') {
-    throw new Error(`JSON array not found in command output:\n${output}`);
+  const candidateStarts = [0];
+
+  for (let index = 0; index < output.length; index += 1) {
+    if (output[index] === '\n') {
+      candidateStarts.push(index + 1);
+    }
   }
-  return JSON.parse(output.slice(start));
+
+  for (const start of candidateStarts.reverse()) {
+    if (output[start] !== '[' && output[start] !== '{') {
+      continue;
+    }
+
+    try {
+      return JSON.parse(output.slice(start));
+    } catch {
+      // npm lifecycle output can precede the final JSON document.
+    }
+  }
+
+  throw new Error(`JSON document not found in command output:\n${output}`);
 }
+
+function normalizePackEntries(packMetadata) {
+  const entries = Array.isArray(packMetadata)
+    ? packMetadata
+    : Object.values(packMetadata);
+
+  if (entries.length !== 1 || typeof entries[0]?.filename !== 'string') {
+    throw new Error(
+      `Unexpected npm pack metadata:\n${JSON.stringify(packMetadata, null, 2)}`
+    );
+  }
+
+  return entries;
+}
+
+assert.equal(
+  normalizePackEntries(
+    parseTrailingJson('prepare output\n[{"filename":"npm-10.tgz"}]')
+  )[0].filename,
+  'npm-10.tgz'
+);
+assert.equal(
+  normalizePackEntries(
+    parseTrailingJson(
+      'prepare output\n{"react-native-bs-diff-patch":{"filename":"npm-11.tgz"}}'
+    )
+  )[0].filename,
+  'npm-11.tgz'
+);
 
 async function pathExists(candidate) {
   try {
@@ -55,14 +100,16 @@ async function pathExists(candidate) {
 }
 
 try {
-  const packOutput = parseTrailingJson(
-    run('npm', [
-      'pack',
-      '--ignore-scripts',
-      '--json',
-      '--pack-destination',
-      temporaryDirectory,
-    ])
+  const packOutput = normalizePackEntries(
+    parseTrailingJson(
+      run('npm', [
+        'pack',
+        '--ignore-scripts',
+        '--json',
+        '--pack-destination',
+        temporaryDirectory,
+      ])
+    )
   );
   const tarballPath = path.join(temporaryDirectory, packOutput[0].filename);
 
