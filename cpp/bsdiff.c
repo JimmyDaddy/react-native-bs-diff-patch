@@ -501,7 +501,6 @@ static int bz2_write(struct bsdiff_stream *stream, const void *buffer, int size)
 {
     struct bsdiff_file_stream_context *context = stream->opaque;
     int bz2err;
-    long position;
 
     if (operation_cancelled(context->options)) {
         context->result = BS_OPERATION_CANCELLED;
@@ -514,11 +513,12 @@ static int bz2_write(struct bsdiff_stream *stream, const void *buffer, int size)
         return -1;
     }
 
-    position = ftell(context->file);
-    if (context->options != NULL && context->options->max_output_bytes > 0 &&
-        position >= 0 && position > context->options->max_output_bytes) {
-        context->result = BS_OPERATION_OUTPUT_TOO_LARGE;
-        return -1;
+    if (context->options != NULL && context->options->max_output_bytes > 0) {
+        long position = ftell(context->file);
+        if (position >= 0 && position > context->options->max_output_bytes) {
+            context->result = BS_OPERATION_OUTPUT_TOO_LARGE;
+            return -1;
+        }
     }
     return 0;
 }
@@ -662,7 +662,7 @@ static int bsDiffFileInternal(
         goto cleanup;
     }
     operation_progress(options, BS_OPERATION_WRITING, 0.95);
-    if (fflush(pf) != 0 || fsync(fileno(pf)) != 0)
+    if (options != NULL && (fflush(pf) != 0 || fsync(fileno(pf)) != 0))
         goto cleanup;
     closeResult = fclose(pf);
     pf = NULL;

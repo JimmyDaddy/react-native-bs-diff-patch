@@ -8,6 +8,7 @@
 #endif
 #endif
 
+#include "bsdiff.h"
 #include "bsdiffpatch_operation.h"
 #include "bspatch.h"
 
@@ -160,6 +161,8 @@ int main(void)
     char corruptPatchPath[512];
     char corruptOutputPath[512];
     char racedPath[512];
+    char legacyPatchPath[512];
+    char legacyRestoredPath[512];
     char *directory = mkdtemp(directoryTemplate);
     struct callback_state state;
     struct bs_operation_options options;
@@ -175,6 +178,8 @@ int main(void)
     snprintf(corruptPatchPath, sizeof(corruptPatchPath), "%s/corrupt.patch", directory);
     snprintf(corruptOutputPath, sizeof(corruptOutputPath), "%s/corrupt-output.bin", directory);
     snprintf(racedPath, sizeof(racedPath), "%s/raced.patch", directory);
+    snprintf(legacyPatchPath, sizeof(legacyPatchPath), "%s/legacy.patch", directory);
+    snprintf(legacyRestoredPath, sizeof(legacyRestoredPath), "%s/legacy-restored.bin", directory);
     CHECK(write_fixture(oldPath, 0) == 0, "old fixture creation failed");
     CHECK(write_fixture(newPath, 1) == 0, "new fixture creation failed");
 
@@ -190,6 +195,12 @@ int main(void)
         "legacy patch accepted malformed input");
     CHECK(access(corruptOutputPath, F_OK) != 0,
         "legacy malformed patch committed an output");
+    CHECK(bsDiffFile(oldPath, newPath, legacyPatchPath) == BS_OPERATION_OK,
+        "legacy diff failed");
+    CHECK(bsPatchFile(oldPath, legacyRestoredPath, legacyPatchPath) == BS_OPERATION_OK,
+        "legacy patch failed");
+    CHECK(files_equal(newPath, legacyRestoredPath),
+        "legacy round trip differs from fixture");
 
     memset(&state, 0, sizeof(state));
     state.last_phase = -1;
@@ -260,6 +271,8 @@ int main(void)
     unlink(oldPath);
     unlink(corruptPatchPath);
     unlink(racedPath);
+    unlink(legacyPatchPath);
+    unlink(legacyRestoredPath);
     CHECK(rmdir(directory) == 0, "temporary directory cleanup failed");
     printf("native operation controls: ok\n");
     return 0;

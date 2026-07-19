@@ -389,7 +389,7 @@ static int bsPatchFileInternal(
         if (operation_cancelled(options)) result = BS_OPERATION_CANCELLED;
         goto cleanup;
     }
-    if (fsync(fd) != 0)
+    if (options != NULL && fsync(fd) != 0)
         goto cleanup;
     closeResult = close(fd);
     fd = -1;
