@@ -29,10 +29,14 @@ internal object BsDiffPatchNative {
       throw BsDiffPatchException("EEXIST", "newFile: $newFile already exists")
     }
 
-    return bsPatchFile(
-      oldFileObj.absolutePath,
-      newFileObj.absolutePath,
-      patchFileObj.absolutePath
+    return requireSuccess(
+      "EPATCH",
+      "patch",
+      bsPatchFile(
+        oldFileObj.absolutePath,
+        newFileObj.absolutePath,
+        patchFileObj.absolutePath
+      )
     )
   }
 
@@ -56,11 +60,22 @@ internal object BsDiffPatchNative {
       throw BsDiffPatchException("EEXIST", "patchFile: $patchFile already exists")
     }
 
-    return bsDiffFile(
-      oldFileObj.absolutePath,
-      newFileObj.absolutePath,
-      patchFileObj.absolutePath
+    return requireSuccess(
+      "EDIFF",
+      "diff",
+      bsDiffFile(
+        oldFileObj.absolutePath,
+        newFileObj.absolutePath,
+        patchFileObj.absolutePath
+      )
     )
+  }
+
+  private fun requireSuccess(code: String, operation: String, result: Int): Int {
+    if (result != 0) {
+      throw BsDiffPatchException(code, "$operation failed with native result $result")
+    }
+    return result
   }
 
   private fun validateNonEmpty(value: String, fieldName: String) {

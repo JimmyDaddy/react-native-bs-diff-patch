@@ -63,8 +63,13 @@ RCT_EXPORT_METHOD(patch:(NSString*) oldFile
     const char *newFileCString = [newFile UTF8String];
     const char *patchFileCString = [patchFile UTF8String];
 
-    NSNumber *result = @(bsdiffpatch::patchFile(oldFileCString, newFileCString, patchFileCString));
-    resolve(result);
+    int result = bsdiffpatch::patchFile(oldFileCString, newFileCString, patchFileCString);
+    if (result != 0) {
+        NSString *message = [NSString stringWithFormat:@"patch failed with native result %d", result];
+        reject(@"EPATCH", message, nil);
+        return;
+    }
+    resolve(@(result));
 }
 
 RCT_EXPORT_METHOD(diff:(NSString*) oldFile
@@ -105,8 +110,13 @@ RCT_EXPORT_METHOD(diff:(NSString*) oldFile
     const char *newFileCString = [newFile UTF8String];
     const char *patchFileCString = [patchFile UTF8String];
 
-    NSNumber *result = @(bsdiffpatch::diffFile(oldFileCString, newFileCString, patchFileCString));
-    resolve(result);
+    int result = bsdiffpatch::diffFile(oldFileCString, newFileCString, patchFileCString);
+    if (result != 0) {
+        NSString *message = [NSString stringWithFormat:@"diff failed with native result %d", result];
+        reject(@"EDIFF", message, nil);
+        return;
+    }
+    resolve(@(result));
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

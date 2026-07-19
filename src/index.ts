@@ -2,6 +2,15 @@ import BsDiffPatch from './NativeBsDiffPatch';
 
 export type BinaryInput = ArrayBuffer | ArrayBufferView | Blob;
 
+export interface BinaryOperationOptions {
+  /** Cancel the Web Worker operation. */
+  signal?: AbortSignal;
+  /** Reject when either input exceeds this number of bytes. */
+  maxInputBytes?: number;
+  /** Reject when the generated or restored output exceeds this number of bytes. */
+  maxOutputBytes?: number;
+}
+
 /**
  * generate new file from old file and patch file
  * @param oldFile orignal file path
@@ -44,7 +53,8 @@ function rejectWebOnlyApi(methodName: string): Promise<never> {
  */
 export function diffBytes(
   _oldData: BinaryInput,
-  _newData: BinaryInput
+  _newData: BinaryInput,
+  _options?: BinaryOperationOptions
 ): Promise<Uint8Array> {
   return rejectWebOnlyApi('diffBytes');
 }
@@ -54,7 +64,8 @@ export function diffBytes(
  */
 export function patchBytes(
   _oldData: BinaryInput,
-  _patchData: BinaryInput
+  _patchData: BinaryInput,
+  _options?: BinaryOperationOptions
 ): Promise<Uint8Array> {
   return rejectWebOnlyApi('patchBytes');
 }

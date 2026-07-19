@@ -1,0 +1,61 @@
+plugins {
+  id "com.android.library" version "8.1.4"
+  id "org.jetbrains.kotlin.android"
+}
+
+def reactNativeVersion = providers.gradleProperty("reactNativeVersion").get()
+def architecture = providers.gradleProperty("architecture").orElse("new").get()
+def versionMatch = reactNativeVersion =~ /^(\d+)\.(\d+)\./
+
+if (!versionMatch.find()) {
+  throw new GradleException("Unsupported React Native version: ${reactNativeVersion}")
+}
+
+def reactNativeMinor = versionMatch.group(2).toInteger()
+def repositoryRoot = file("../..").canonicalFile
+def libraryAndroidRoot = new File(repositoryRoot, "android")
+def librarySourceDirectories = [
+  new File(libraryAndroidRoot, "src/main/java")
+]
+
+if (architecture == "new") {
+  librarySourceDirectories += new File(libraryAndroidRoot, "newarch/java")
+  librarySourceDirectories += new File(
+    libraryAndroidRoot,
+    reactNativeMinor >= 74 ? "newarch74/java" : "newarch73/java"
+  )
+  librarySourceDirectories += file("src/newarchStubs/kotlin")
+} else if (architecture == "old") {
+  librarySourceDirectories += new File(libraryAndroidRoot, "oldarch/java")
+} else {
+  throw new GradleException("Unsupported architecture: ${architecture}")
+}
+
+android {
+  namespace "com.jimmydaddy.bsdiffpatch.compatibility"
+  compileSdk 36
+
+  defaultConfig {
+    minSdk 24
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs = librarySourceDirectories
+      manifest.srcFile "src/main/AndroidManifest.xml"
+    }
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  kotlinOptions {
+    jvmTarget = "17"
+  }
+}
+
+dependencies {
+  compileOnly "com.facebook.react:react-android:${reactNativeVersion}"
+}

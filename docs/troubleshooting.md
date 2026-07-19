@@ -7,6 +7,8 @@ Start with the error `code`, then confirm the runtime and input model:
 | Native module cannot be found    | Rebuild the installed native application         |
 | `ENOENT`, `EEXIST`, `EINVAL`     | Inspect path state before starting native work   |
 | `EUNSUPPORTED`                   | Confirm that the correct API family was selected |
+| `EABORTED`, `ERESOURCE`          | Check Web cancellation and byte limits           |
+| `EDIFF`, `EPATCH`                | Check native I/O and patch integrity             |
 | Worker or `EWEBASSEMBLY` failure | Check emitted Web assets, CSP, and patch magic   |
 | High memory use                  | Enforce input and concurrency limits             |
 
@@ -45,6 +47,14 @@ The path-based `diff` and `patch` APIs are native-only. Use `diffBytes` and
 `patchBytes` in React Native Web. If a binary API reports that Web Workers are
 required, call it in browser/client code rather than during SSR.
 
+## `EABORTED` or `ERESOURCE`
+
+`EABORTED` means the `AbortSignal` supplied to a Web operation was already
+aborted or became aborted while its dedicated Worker was active. `ERESOURCE`
+means an input, generated patch, or declared restored output exceeded the
+configured byte limit. Both are expected control-flow errors rather than a
+WebAssembly failure.
+
 ## Worker failed to load
 
 Confirm the bundler emits module-worker assets and that the deployed server
@@ -55,11 +65,16 @@ Open the browser network panel and confirm `worker.mjs`, `operations.mjs`, and
 `bsdiffpatch.mjs` are returned with successful status codes rather than the
 application HTML fallback.
 
-## `EWEBASSEMBLY` or corrupt patch
+## `EPATCH`, `EWEBASSEMBLY`, or corrupt patch
 
 Check the first 16 bytes of the patch. Supported patches begin with
 `ENDSLEY/BSDIFF43`. A truncated patch, a `BSDIFF40` patch, or unrelated binary
 data will be rejected.
+
+Native corrupt-patch failures use `EPATCH`; native patch-generation failures
+use `EDIFF`. Web validation and C-core failures use `EWEBASSEMBLY` unless a
+resource limit supplied the more specific `ERESOURCE` code. Failed native calls
+remove any partial output owned by that operation.
 
 ## High memory use
 
@@ -67,8 +82,9 @@ The algorithm and adapters operate on complete in-memory buffers. Add a size
 check before calling the library and avoid accepting arbitrary large untrusted
 files. Web execution is off-main-thread but still consumes the tab's memory.
 
-Multiple Web operations create separate Workers. Debounce repeated user actions
-and add an application-level queue if large calls can overlap.
+Unsignalled Web operations queue through a shared Worker. Signalled operations
+use dedicated Workers for isolated cancellation. Debounce repeated user actions
+and add an application-level budget if large calls can overlap.
 
 ## Restored output does not match
 

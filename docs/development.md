@@ -31,12 +31,37 @@ yarn test --runInBand
 yarn test:web
 yarn test:web:browser
 yarn test:web:metro
+yarn test:package
 ```
 
 - `test:web` checks the WebAssembly round trip and patch magic.
 - `test:web:browser` runs the public Worker API in Chrome.
 - `test:web:metro` proves Metro selects the `.web` entry rather than the native
   TurboModule facade.
+- `test:package` installs the real tarball into a clean consumer and verifies
+  browser, ESM, CommonJS, TypeScript, and optional-peer behavior.
+
+## Native robustness and compatibility
+
+```sh
+FUZZ_RUNS=2000 yarn test:fuzz
+scripts/test-rn-android-compatibility.sh 0.73.11 new
+scripts/test-rn-android-compatibility.sh 0.74.7 new
+scripts/test-rn-android-compatibility.sh 0.86.0 new
+```
+
+The fuzz gate uses libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer
+when the local Clang runtime provides it, otherwise it runs a deterministic
+sanitizer corpus. The compatibility fixture compiles the actual Android module
+sources against the selected React Native artifact instead of relying on
+source-pattern assertions.
+
+Run the repeatable Web performance baseline with:
+
+```sh
+yarn benchmark:web
+BENCHMARK_OUTPUT=/tmp/web-wasm.json yarn benchmark:web
+```
 
 ## Site and documentation
 
@@ -65,16 +90,19 @@ Commit the regenerated `web/bsdiffpatch.mjs` with the C source change.
 
 ## Native verification
 
-Android CI builds both architecture modes and runs the New Architecture device
-round trip on its emulator matrix. iOS CI uses the CocoaPods version locked in
-the example Gemfile to build and test both legacy and New Architecture modes.
+Android CI builds both architecture modes, directly compiles New Architecture
+sources against React Native 0.73.11, 0.74.7, and 0.86.0, and runs the New
+Architecture device round trip on its emulator matrix. iOS CI uses the CocoaPods
+version locked in the example Gemfile to build and test both legacy and New
+Architecture modes. Device tests include cross-platform golden patches and
+malformed-patch rejection.
 
 For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Publishing checklist
 
 1. Run the core, Web, and site gates.
-2. Inspect `npm pack --dry-run --ignore-scripts` and confirm `web/` is present.
+2. Run `yarn test:package` and inspect `npm pack --dry-run --ignore-scripts`.
 3. Confirm public docs match the exported TypeScript declarations.
 4. Confirm English and Chinese public guides describe the same behavior.
 5. Use `yarn release` to create the version, tag, and GitHub Release. It does not

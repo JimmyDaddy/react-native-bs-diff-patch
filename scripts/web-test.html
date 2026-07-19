@@ -45,21 +45,78 @@
           invalidInputErrorCode = error.code;
         }
 
+        let inputLimitErrorCode;
+        try {
+          await diffBytes(oldData, newData, { maxInputBytes: 1 });
+        } catch (error) {
+          inputLimitErrorCode = error.code;
+        }
+
+        let outputLimitErrorCode;
+        try {
+          await patchBytes(oldData, patchData, {
+            maxOutputBytes: newData.byteLength - 1,
+          });
+        } catch (error) {
+          outputLimitErrorCode = error.code;
+        }
+
+        const abortController = new AbortController();
+        abortController.abort();
+        let abortErrorCode;
+        try {
+          await diffBytes(oldData, newData, {
+            signal: abortController.signal,
+          });
+        } catch (error) {
+          abortErrorCode = error.code;
+        }
+
+        const activeAbortController = new AbortController();
+        const activeOldData = new Uint8Array(4 * 1024 * 1024);
+        const activeNewData = activeOldData.slice();
+        activeNewData[activeNewData.length - 1] = 1;
+        const activeOperation = diffBytes(activeOldData, activeNewData, {
+          signal: activeAbortController.signal,
+        });
+        setTimeout(() => activeAbortController.abort(), 20);
+        let activeAbortErrorCode;
+        try {
+          await activeOperation;
+        } catch (error) {
+          activeAbortErrorCode = error.code;
+        }
+
+        const afterAbortData = await patchBytes(oldData, patchData);
+        const sharedSurvivedAbort =
+          afterAbortData.length === newData.length &&
+          afterAbortData.every((value, index) => value === newData[index]);
+
         if (
           !restoredMatches ||
           !inputsPreserved ||
+          activeAbortErrorCode !== 'EABORTED' ||
+          abortErrorCode !== 'EABORTED' ||
+          inputLimitErrorCode !== 'ERESOURCE' ||
           invalidInputErrorCode !== 'EINVAL' ||
-          pathApiErrorCode !== 'EUNSUPPORTED'
+          outputLimitErrorCode !== 'ERESOURCE' ||
+          pathApiErrorCode !== 'EUNSUPPORTED' ||
+          !sharedSurvivedAbort
         ) {
           throw new Error('browser assertions failed');
         }
 
         window.__bsdiffWebTestResult = {
+          activeAbortErrorCode,
+          abortErrorCode,
           inputsPreserved,
+          inputLimitErrorCode,
           invalidInputErrorCode,
+          outputLimitErrorCode,
           patchLength: patchData.length,
           pathApiErrorCode,
           restoredMatches,
+          sharedSurvivedAbort,
         };
         document.body.dataset.status = 'passed';
         status.textContent = 'Passed';

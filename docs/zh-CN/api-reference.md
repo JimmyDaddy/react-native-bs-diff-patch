@@ -10,6 +10,7 @@ import {
   diffBytes,
   patchBytes,
   type BinaryInput,
+  type BinaryOperationOptions,
 } from 'react-native-bs-diff-patch';
 ```
 
@@ -53,9 +54,16 @@ function patch(
 ```ts
 type BinaryInput = ArrayBuffer | ArrayBufferView | Blob;
 
+interface BinaryOperationOptions {
+  signal?: AbortSignal;
+  maxInputBytes?: number;
+  maxOutputBytes?: number;
+}
+
 function diffBytes(
   oldData: BinaryInput,
-  newData: BinaryInput
+  newData: BinaryInput,
+  options?: BinaryOperationOptions
 ): Promise<Uint8Array>;
 ```
 
@@ -64,13 +72,16 @@ function diffBytes(
 - 接受 `ArrayBuffer`、任意 TypedArray、`DataView` 和 `Blob`。
 - 会复制输入，不会让调用方缓冲区失效。
 - 返回包含 `ENDSLEY/BSDIFF43` 补丁的新 `Uint8Array`。
+- 配置上限后，分别用 `maxInputBytes` 检查每个输入，并用 `maxOutputBytes`
+  检查生成补丁。
 
 ## `patchBytes`
 
 ```ts
 function patchBytes(
   oldData: BinaryInput,
-  patchData: BinaryInput
+  patchData: BinaryInput,
+  options?: BinaryOperationOptions
 ): Promise<Uint8Array>;
 ```
 
@@ -79,6 +90,19 @@ function patchBytes(
 - 进入 WebAssembly 核心前会校验补丁头。
 - 复制输入并返回新的 `Uint8Array`。
 - 不会修改 `oldData` 或 `patchData`。
+- 当补丁头声明的输出超过 `maxOutputBytes` 时，会在分配输出前拒绝。
+
+## Web 操作选项
+
+- `signal` 取消当前 Web 操作。带 signal 的调用使用专用 Worker，因此取消不会中断
+  其他请求。
+- `maxInputBytes` 分别限制每个二进制输入，而不是输入之和。
+- `maxOutputBytes` 限制生成补丁或还原输出。
+- 上限必须是非负安全整数；非法上限以 `EINVAL` 拒绝，超过上限以 `ERESOURCE`
+  拒绝。
+
+原生端的二进制 API 接受 options 参数只是为了让共享封装保持源码兼容，随后仍会以
+`EUNSUPPORTED` 拒绝。原生资源策略由应用的文件系统与外围流程负责。
 
 ## 平台不可用时的行为
 
@@ -103,6 +127,10 @@ type PatchError = Error & { code?: string };
 | `EEXIST`       | 原生端输出路径已经存在。                  |
 | `EUNSUPPORTED` | 当前平台不支持所选 API。                  |
 | `EUNAVAILABLE` | 原生模块工作队列已经关闭。                |
+| `EABORTED`     | Web 操作被传入的 signal 取消。            |
+| `ERESOURCE`    | 超过配置的 Web 输入或输出字节上限。       |
+| `EDIFF`        | 原生 diff 核心拒绝输入或无法写入补丁。    |
+| `EPATCH`       | 原生 patch 核心拒绝损坏补丁或输出失败。   |
 | `EWEBASSEMBLY` | Worker、补丁校验或 WebAssembly 执行失败。 |
 | `EUNSPECIFIED` | 未分类的原生异常。                        |
 
@@ -110,8 +138,9 @@ type PatchError = Error & { code?: string };
 
 ## 并发与顺序
 
-每个原生平台使用库内部的串行队列。每次 Web 调用会创建独立模块 Worker，并在完成后
-终止。不要假设不同 Web 调用会按提交顺序结束；对大输入应设置应用级并发限制。
+每个原生平台使用库内部的串行队列。不带 signal 的 Web 调用共用一个模块 Worker、
+串行请求队列和已缓存的 WebAssembly 模块；带 signal 的调用使用专用 Worker，确保
+取消仅影响当前操作。对大输入仍应设置应用级并发和内存预算。
 
 ## 补丁格式
 

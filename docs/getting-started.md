@@ -87,8 +87,14 @@ const encoder = new TextEncoder();
 const oldData = encoder.encode('version 1');
 const newData = encoder.encode('version 2 with web support');
 
-const patchData = await diffBytes(oldData, newData);
-const restoredData = await patchBytes(oldData, patchData);
+const controller = new AbortController();
+const options = {
+  signal: controller.signal,
+  maxInputBytes: 32 * 1024 * 1024,
+  maxOutputBytes: 32 * 1024 * 1024,
+};
+const patchData = await diffBytes(oldData, newData, options);
+const restoredData = await patchBytes(oldData, patchData, options);
 
 const matches =
   restoredData.length === newData.length &&
@@ -101,6 +107,11 @@ if (!matches) {
 
 Inputs are copied before being transferred to the module Worker, so the
 caller's buffers remain usable. Each result is a new `Uint8Array`.
+
+Call `controller.abort()` to reject the active operation with `EABORTED`.
+Configured byte limits reject with `ERESOURCE`. Calls without a signal reuse a
+shared Worker and WebAssembly instance; calls with a signal use a dedicated
+Worker so aborting one operation cannot interrupt another.
 
 ## Use browser files
 

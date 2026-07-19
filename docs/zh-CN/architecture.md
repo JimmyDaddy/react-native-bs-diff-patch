@@ -14,13 +14,18 @@ React Native JavaScript
 
 React Native Web
   -> 强类型公开 API
-  -> 模块 Web Worker
+  -> 共享或取消任务专用的模块 Web Worker
   -> Emscripten MEMFS
   -> 由同一套 bsdiff + bzip2 C 源码编译的 WebAssembly
 ```
 
 Worker 边界让高开销二进制计算离开 JavaScript / UI 线程，但不会消除算法成本。
 调用方仍需设置符合产品场景的输入大小和时间限制。
+
+未传 `AbortSignal` 的 Web 调用复用一个 Worker 和已缓存的 Emscripten 模块，避免
+重复初始化 Worker 与 WebAssembly。带 signal 的调用使用专用 Worker，取消 signal
+只会终止该 Worker。每个 Worker 在自己的队列内串行执行，并在每次操作后删除
+MEMFS 临时文件。
 
 ## 补丁线格式
 
@@ -49,6 +54,28 @@ bsdiff 和 bzip2 源码，从而保持跨平台兼容。
 - 导出的 `bsDiffFile` 和 `bsPatchFile` 函数。
 
 生成的 `web/bsdiffpatch.mjs` 随 npm 包发布，消费者无需安装 Emscripten。
+
+## 兼容性验证
+
+仓库内 golden fixture 证明 Web 实现生成的确定性补丁字节可被 Android 与 iOS
+消费。设备运行时测试还会应用 Web golden patch，并验证截断补丁会被拒绝且不会
+留下残缺输出。C patch 核心具有 sanitizer 支持的畸形输入 fuzz 覆盖，非法数据不会
+终止宿主进程。
+
+## Web 参考基准
+
+`yarn benchmark:web` 使用每 4 KiB 修改一个字节的确定性输入，并逐字节验证还原
+结果。在 Apple M3 Pro、Node 26.5.0 上，仓库记录的 2026-07-19 基准如下：
+
+| 输入   | Diff        | Patch    | 补丁字节数 |
+| ------ | ----------- | -------- | ---------- |
+| 1 MiB  | 158.5 ms    | 7.7 ms   | 110        |
+| 10 MiB | 4,243.6 ms  | 57.5 ms  | 118        |
+| 50 MiB | 30,697.5 ms | 285.2 ms | 203        |
+
+这些数据是可复现的开发基线，不是设备或浏览器性能保证。输入相似度、CPU、浏览器、
+内存压力和工具链版本都会显著影响结果。完整机器可读记录位于
+[`benchmarks/web-wasm.json`](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/benchmarks/web-wasm.json)。
 
 ## 内存模型
 

@@ -75,11 +75,34 @@ the input or output size. Before starting an operation:
 - reject input larger than the product's tested limit;
 - confirm sufficient local storage for native temporary outputs;
 - prevent unbounded simultaneous calls from user actions;
-- expose cancellation at the surrounding workflow level when appropriate;
+- pass an `AbortSignal` to Web operations when cancellation is appropriate;
 - move very large update generation to controlled backend infrastructure.
 
-Native calls share a library-owned serial queue. Separate Web calls each create
-their own Worker, so the application should limit Web concurrency explicitly.
+Native calls share a library-owned serial queue. Web calls without a signal
+reuse a shared Worker and WebAssembly instance. Signalled calls use dedicated
+Workers so they can be terminated independently. The application should still
+limit aggregate Web concurrency and memory explicitly.
+
+```ts
+const controller = new AbortController();
+const options = {
+  signal: controller.signal,
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 64 * 1024 * 1024,
+};
+
+try {
+  const patchData = await diffBytes(oldData, newData, options);
+  const restoredData = await patchBytes(oldData, patchData, options);
+} catch (error) {
+  if (isPatchError(error) && error.code === 'EABORTED') return;
+  if (isPatchError(error) && error.code === 'ERESOURCE') {
+    // Show the product's size-limit guidance.
+    return;
+  }
+  throw error;
+}
+```
 
 ## Download a Web patch
 

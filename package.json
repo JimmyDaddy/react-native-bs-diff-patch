@@ -8,6 +8,17 @@
   "types": "lib/typescript/src/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
+  "exports": {
+    ".": {
+      "types": "./lib/typescript/src/index.d.ts",
+      "react-native": "./src/index.ts",
+      "browser": "./web/index.mjs",
+      "import": "./lib/module/index.js",
+      "require": "./lib/commonjs/index.js",
+      "default": "./lib/commonjs/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "src",
     "lib",
@@ -15,7 +26,6 @@
     "ios",
     "cpp",
     "web",
-    "scripts/build-web-wasm.sh",
     "*.podspec",
     "!ios/build",
     "!android/build",
@@ -29,6 +39,7 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
+    "!cpp/fuzz",
     "!**/.*"
   ],
   "scripts": {
@@ -37,6 +48,9 @@
     "test:web": "node scripts/test-web.mjs",
     "test:web:browser": "node scripts/test-web-browser.mjs",
     "test:web:metro": "node scripts/test-web-metro.mjs",
+    "test:package": "node scripts/test-package-consumers.mjs",
+    "test:fuzz": "sh scripts/test-native-fuzz.sh",
+    "benchmark:web": "node scripts/benchmark-web.mjs",
     "site:build": "node scripts/build-site.mjs",
     "site:test": "node scripts/test-site.mjs",
     "site:test:browser": "node scripts/test-site-browser.mjs",
@@ -44,7 +58,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bob build",
+    "prepare": "bob build && node scripts/prepare-package.mjs",
     "build:web": "bash scripts/build-web-wasm.sh",
     "release": "release-it"
   },
@@ -64,7 +78,7 @@
   "bugs": {
     "url": "https://github.com/JimmyDaddy/react-native-bs-diff-patch/issues"
   },
-  "homepage": "https://github.com/JimmyDaddy/react-native-bs-diff-patch#readme",
+  "homepage": "https://bs-dff-patch.corerobin.com",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -99,6 +113,14 @@
     "react": "*",
     "react-native": "*"
   },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
+  },
   "workspaces": [
     "example"
   ],
@@ -131,7 +153,8 @@
     },
     "plugins": {
       "@release-it/conventional-changelog": {
-        "preset": "angular"
+        "preset": "angular",
+        "infile": "CHANGELOG.md"
       }
     }
   },

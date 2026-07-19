@@ -66,11 +66,33 @@ try {
 - 拒绝超过产品验证上限的输入；
 - 确认原生端临时输出所需的本地空间；
 - 防止用户操作触发无限并发；
-- 在外围流程适合的位置提供取消能力；
+- Web 操作需要取消时传入 `AbortSignal`；
 - 将超大更新的生成工作放到受控后端基础设施。
 
-原生调用共用库内部串行队列；不同 Web 调用各自创建 Worker，因此应用应显式限制
-Web 并发。
+原生调用共用库内部串行队列。不带 signal 的 Web 调用复用共享 Worker 与
+WebAssembly 实例；带 signal 的调用使用专用 Worker，因此可以独立终止。应用仍应
+显式限制 Web 总并发和内存。
+
+```ts
+const controller = new AbortController();
+const options = {
+  signal: controller.signal,
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 64 * 1024 * 1024,
+};
+
+try {
+  const patchData = await diffBytes(oldData, newData, options);
+  const restoredData = await patchBytes(oldData, patchData, options);
+} catch (error) {
+  if (isPatchError(error) && error.code === 'EABORTED') return;
+  if (isPatchError(error) && error.code === 'ERESOURCE') {
+    // 展示产品自己的大小限制说明。
+    return;
+  }
+  throw error;
+}
+```
 
 ## 下载 Web 补丁
 

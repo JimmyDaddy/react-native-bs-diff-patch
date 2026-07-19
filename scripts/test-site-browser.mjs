@@ -89,10 +89,12 @@ try {
     heading: document.querySelector('h1')?.textContent,
     patchSize: document.querySelector('#patch-size')?.textContent,
     status: document.querySelector('#playground-status')?.textContent?.trim(),
+    evidenceRows: document.querySelectorAll('.benchmark-table tbody tr').length,
   }));
   assert.match(result.heading || '', /Binary deltas/);
   assert.notEqual(result.patchSize, '—');
   assert.match(result.status || '', /verified byte-for-byte/);
+  assert.equal(result.evidenceRows, 3);
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await page.reload({ waitUntil: 'networkidle0' });
