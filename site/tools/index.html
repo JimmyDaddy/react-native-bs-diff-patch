@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="{{META_DESCRIPTION}}" />
+    <meta name="theme-color" content="#060a0d" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="{{OG_TITLE}}" />
+    <meta property="og:description" content="{{META_DESCRIPTION}}" />
+    <meta
+      property="og:url"
+      content="https://bs-dff-patch.corerobin.com{{CANONICAL_PATH}}"
+    />
+    <meta
+      property="og:image"
+      content="https://bs-dff-patch.corerobin.com/assets/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:type" content="image/png" />
+    <meta
+      property="og:image:alt"
+      content="Binary patches everywhere React Native runs: Android, iOS, and Web"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{OG_TITLE}}" />
+    <meta name="twitter:description" content="{{META_DESCRIPTION}}" />
+    <meta
+      name="twitter:image"
+      content="https://bs-dff-patch.corerobin.com/assets/social-preview.png"
+    />
+    <link
+      rel="canonical"
+      href="https://bs-dff-patch.corerobin.com{{CANONICAL_PATH}}"
+    />
+    <link
+      rel="alternate"
+      hreflang="{{ALTERNATE_LANGUAGE}}"
+      href="https://bs-dff-patch.corerobin.com{{ALTERNATE_PATH}}"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <title>{{PAGE_TITLE}}</title>
+  </head>
+  <body class="tools-body">
+    <a class="skip-link" href="#tools-main">{{SKIP_LABEL}}</a>
+    <div class="page-grid" aria-hidden="true"></div>
+
+    <header class="site-header shell">
+      <a class="brand" href="{{HOME_PATH}}" aria-label="{{HOME_ARIA_LABEL}}">
+        <span class="brand-mark" aria-hidden="true">BΔ</span>
+        <span>react-native-bs-diff-patch</span>
+      </a>
+      <nav class="nav-links" aria-label="{{PRIMARY_NAVIGATION_LABEL}}">
+        <a href="{{HOME_PATH}}">{{HOME_LABEL}}</a>
+        <a href="{{PLAYGROUND_PATH}}">{{PLAYGROUND_LABEL}}</a>
+        <a href="{{CANONICAL_PATH}}" aria-current="page">{{TOOLS_LABEL}}</a>
+        <a href="{{DOCS_PATH}}">{{DOCS_LABEL}}</a>
+        <a
+          class="language-switch"
+          href="{{ALTERNATE_PATH}}"
+          hreflang="{{ALTERNATE_LANGUAGE}}"
+          >{{ALTERNATE_LABEL}}</a
+        >
+        <a
+          class="github-link"
+          href="https://github.com/JimmyDaddy/react-native-bs-diff-patch"
+          rel="noreferrer"
+        >
+          <span class="status-dot" aria-hidden="true"></span>
+          GitHub
+        </a>
+      </nav>
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="{{PRIMARY_NAVIGATION_LABEL}}"
+        data-closed-label="{{MENU_LABEL}}"
+        data-open-label="{{CLOSE_LABEL}}"
+      >
+        {{MENU_LABEL}}
+      </button>
+    </header>
+
+    <main id="tools-main" class="tools-main shell">
+      <section class="tools-hero" aria-labelledby="tools-title">
+        <div>
+          <p class="section-kicker">
+            <span class="lang-en"
+              >Private by design · Powered by the package</span
+            >
+            <span class="lang-zh">隐私优先 · 由包自身驱动</span>
+          </p>
+          <h1 id="tools-title">
+            <span class="lang-en"
+              >Binary patch tools.<br /><span class="headline-accent"
+                >No upload</span
+              >
+              required.</span
+            >
+            <span class="lang-zh"
+              >二进制补丁<br class="tools-mobile-break" />工具。<br /><span
+                class="headline-accent"
+                >无需上传</span
+              >文件。</span
+            >
+          </h1>
+          <p class="tools-lede lang-en">
+            Create, apply, inspect, and verify <code>ENDSLEY/BSDIFF43</code>
+            patches locally with the same Web Worker and WebAssembly runtime
+            shipped by react-native-bs-diff-patch.
+          </p>
+          <p class="tools-lede lang-zh">
+            使用 react-native-bs-diff-patch 自带的 Web Worker 与 WebAssembly
+            运行时，在本地创建、应用、检查和验证
+            <code>ENDSLEY/BSDIFF43</code> 补丁。
+          </p>
+        </div>
+        <aside class="privacy-card" aria-label="Local processing notice">
+          <span class="privacy-icon" aria-hidden="true">LOCAL</span>
+          <div>
+            <strong class="lang-en">Your files stay in this browser</strong>
+            <strong class="lang-zh">文件始终留在当前浏览器</strong>
+            <p class="lang-en">
+              No server receives file contents, names, hashes, or generated
+              patches. Reset the tool to release the selected files.
+            </p>
+            <p class="lang-zh">
+              服务器不会收到文件内容、名称、哈希或生成的补丁。重置工具即可释放所选文件。
+            </p>
+          </div>
+          <span
+            id="tool-runtime-state"
+            class="runtime-state"
+            data-state="loading"
+            >{{RUNTIME_LOADING}}</span
+          >
+        </aside>
+      </section>
+
+      <section class="toolkit" aria-labelledby="toolkit-title">
+        <header class="toolkit-heading">
+          <div>
+            <p class="section-kicker">
+              <span class="lang-en">Binary Patch Toolkit</span>
+              <span class="lang-zh">二进制补丁工具箱</span>
+            </p>
+            <h2 id="toolkit-title">
+              <span class="lang-en"
+                >Use real files. Get reproducible evidence.</span
+              >
+              <span class="lang-zh">使用真实文件，获得可复现的验证结果。</span>
+            </h2>
+          </div>
+          <p class="lang-en">
+            Choose an operation below. Every generated result includes hashes,
+            byte counts, and a report you can paste into an issue.
+          </p>
+          <p class="lang-zh">
+            选择下方操作。每次生成的结果都包含哈希、字节数和可直接粘贴到 Issue
+            的报告。
+          </p>
+        </header>
+
+        <div
+          class="tool-tabs"
+          role="tablist"
+          aria-label="Binary patch operations"
+        >
+          <button
+            id="create-tab"
+            type="button"
+            role="tab"
+            aria-controls="create-panel"
+            aria-selected="true"
+            data-tool-tab="create"
+          >
+            <span>01</span>
+            <strong class="lang-en">Create Patch</strong>
+            <strong class="lang-zh">创建补丁</strong>
+            <small class="lang-en">Old + new → patch</small>
+            <small class="lang-zh">旧文件 + 新文件 → 补丁</small>
+          </button>
+          <button
+            id="apply-tab"
+            type="button"
+            role="tab"
+            aria-controls="apply-panel"
+            aria-selected="false"
+            tabindex="-1"
+            data-tool-tab="apply"
+          >
+            <span>02</span>
+            <strong class="lang-en">Apply &amp; Verify</strong>
+            <strong class="lang-zh">应用与验证</strong>
+            <small class="lang-en">Old + patch → restored</small>
+            <small class="lang-zh">旧文件 + 补丁 → 还原文件</small>
+          </button>
+          <button
+            id="inspect-tab"
+            type="button"
+            role="tab"
+            aria-controls="inspect-panel"
+            aria-selected="false"
+            tabindex="-1"
+            data-tool-tab="inspect"
+          >
+            <span>03</span>
+            <strong>Patch Inspector</strong>
+            <small class="lang-en">Read and validate the header</small>
+            <small class="lang-zh">读取并检查补丁头</small>
+          </button>
+        </div>
+
+        <section
+          id="create-panel"
+          class="tool-panel"
+          role="tabpanel"
+          aria-labelledby="create-tab"
+          data-tool-panel="create"
+        >
+          <div class="tool-panel-main">
+            <header class="tool-panel-header">
+              <div>
+                <span class="tool-step">01 / DIFF</span>
+                <h3 class="lang-en">Generate a compatible patch</h3>
+                <h3 class="lang-zh">生成兼容补丁</h3>
+              </div>
+              <p class="lang-en">
+                Select the baseline and target. The result is immediately
+                applied again and verified byte-for-byte before download.
+              </p>
+              <p class="lang-zh">
+                选择基线文件和目标文件。下载前会立即重新应用补丁，并进行逐字节验证。
+              </p>
+            </header>
+
+            <div class="file-grid">
+              <label class="file-drop" data-file-drop for="create-old-file">
+                <input id="create-old-file" type="file" />
+                <span class="file-drop-number">01</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">Old / baseline file</strong>
+                  <strong class="lang-zh">旧文件 / 基线文件</strong>
+                  <span class="lang-en">Choose or drop any binary file</span>
+                  <span class="lang-zh">选择或拖入任意二进制文件</span>
+                </span>
+                <output data-file-summary="create-old-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+              <label class="file-drop" data-file-drop for="create-new-file">
+                <input id="create-new-file" type="file" />
+                <span class="file-drop-number">02</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">New / target file</strong>
+                  <strong class="lang-zh">新文件 / 目标文件</strong>
+                  <span class="lang-en">Choose or drop the updated file</span>
+                  <span class="lang-zh">选择或拖入更新后的文件</span>
+                </span>
+                <output data-file-summary="create-new-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+            </div>
+
+            <div class="tool-options">
+              <label>
+                <span class="lang-en">Maximum input per file</span>
+                <span class="lang-zh">单个输入文件上限</span>
+                <select id="create-max-input">
+                  <option value="16777216">16 MiB</option>
+                  <option value="67108864" selected>64 MiB</option>
+                  <option value="134217728">128 MiB</option>
+                  <option value="268435456">256 MiB</option>
+                  <option value="">{{NO_LIMIT_LABEL}}</option>
+                </select>
+              </label>
+              <label>
+                <span class="lang-en">Maximum generated output</span>
+                <span class="lang-zh">生成结果上限</span>
+                <select id="create-max-output">
+                  <option value="33554432">32 MiB</option>
+                  <option value="134217728" selected>128 MiB</option>
+                  <option value="268435456">256 MiB</option>
+                  <option value="536870912">512 MiB</option>
+                  <option value="">{{NO_LIMIT_LABEL}}</option>
+                </select>
+              </label>
+              <div class="memory-note">
+                <strong class="lang-en">Whole-buffer operation</strong>
+                <strong class="lang-zh">整块缓冲区操作</strong>
+                <span class="lang-en"
+                  >Peak memory can be several times the selected file
+                  sizes.</span
+                >
+                <span class="lang-zh"
+                  >峰值内存可能达到所选文件大小的数倍。</span
+                >
+              </div>
+            </div>
+
+            <div class="tool-actions">
+              <button
+                id="create-run"
+                class="primary-button tool-run"
+                type="button"
+              >
+                <span class="lang-en">Generate &amp; verify patch</span>
+                <span class="lang-zh">生成并验证补丁</span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <button
+                id="create-cancel"
+                class="secondary-button danger-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Cancel active</span>
+                <span class="lang-zh">取消当前操作</span>
+              </button>
+              <button id="create-reset" class="secondary-button" type="button">
+                <span class="lang-en">Reset</span>
+                <span class="lang-zh">重置</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="tool-result" aria-live="polite">
+            <header>
+              <span class="lang-en">Result / compatibility report</span>
+              <span class="lang-zh">结果 / 兼容性报告</span>
+              <strong id="create-status" class="tool-status" data-state="idle"
+                >{{READY_LABEL}}</strong
+              >
+            </header>
+            <div class="tool-metrics">
+              <div>
+                <span class="lang-en">Patch size</span
+                ><span class="lang-zh">补丁大小</span
+                ><strong id="create-patch-size">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Transfer saved</span
+                ><span class="lang-zh">节省传输</span
+                ><strong id="create-saving">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Runtime</span
+                ><span class="lang-zh">运行耗时</span
+                ><strong id="create-runtime">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Verification</span
+                ><span class="lang-zh">验证结果</span
+                ><strong id="create-verification">—</strong>
+              </div>
+            </div>
+            <pre
+              class="tool-report"
+            ><code id="create-report">{{REPORT_EMPTY}}</code></pre>
+            <div class="result-actions">
+              <button
+                id="create-download"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Download .patch</span>
+                <span class="lang-zh">下载 .patch</span>
+              </button>
+              <button
+                id="create-copy-report"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Copy report</span>
+                <span class="lang-zh">复制报告</span>
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <section
+          id="apply-panel"
+          class="tool-panel"
+          role="tabpanel"
+          aria-labelledby="apply-tab"
+          data-tool-panel="apply"
+          hidden
+        >
+          <div class="tool-panel-main">
+            <header class="tool-panel-header">
+              <div>
+                <span class="tool-step">02 / PATCH</span>
+                <h3 class="lang-en">Restore and verify a target file</h3>
+                <h3 class="lang-zh">还原并验证目标文件</h3>
+              </div>
+              <p class="lang-en">
+                Add an expected file or trusted SHA-256 to turn restoration into
+                an integrity check. A hash is only trustworthy when its expected
+                value comes from a trusted manifest.
+              </p>
+              <p class="lang-zh">
+                添加预期文件或可信
+                SHA-256，将还原过程转化为完整性校验。只有来自可信清单的预期哈希才可信。
+              </p>
+            </header>
+
+            <div class="file-grid">
+              <label class="file-drop" data-file-drop for="apply-old-file">
+                <input id="apply-old-file" type="file" />
+                <span class="file-drop-number">01</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">Old / baseline file</strong>
+                  <strong class="lang-zh">旧文件 / 基线文件</strong>
+                  <span class="lang-en">Must match the patch baseline</span>
+                  <span class="lang-zh">必须与补丁基线一致</span>
+                </span>
+                <output data-file-summary="apply-old-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+              <label class="file-drop" data-file-drop for="apply-patch-file">
+                <input
+                  id="apply-patch-file"
+                  type="file"
+                  accept=".patch,application/octet-stream"
+                />
+                <span class="file-drop-number">02</span>
+                <span class="file-drop-copy">
+                  <strong>ENDSLEY / BSDIFF43 patch</strong>
+                  <span class="lang-en">Choose or drop the patch file</span>
+                  <span class="lang-zh">选择或拖入补丁文件</span>
+                </span>
+                <output data-file-summary="apply-patch-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+              <label
+                class="file-drop optional-file"
+                data-file-drop
+                for="apply-expected-file"
+              >
+                <input id="apply-expected-file" type="file" />
+                <span class="file-drop-number">03</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">Expected target (optional)</strong>
+                  <strong class="lang-zh">预期目标文件（可选）</strong>
+                  <span class="lang-en">Enables byte-for-byte comparison</span>
+                  <span class="lang-zh">用于逐字节比较</span>
+                </span>
+                <output data-file-summary="apply-expected-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+            </div>
+
+            <div class="verification-options">
+              <label class="hash-input">
+                <span class="lang-en">Trusted target SHA-256 (optional)</span>
+                <span class="lang-zh">可信目标 SHA-256（可选）</span>
+                <input
+                  id="apply-expected-sha256"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="64 hexadecimal characters"
+                />
+              </label>
+              <label>
+                <span class="lang-en">Patch created on</span>
+                <span class="lang-zh">补丁生成平台</span>
+                <select id="apply-origin">
+                  <option value="Unknown">{{UNKNOWN_LABEL}}</option>
+                  <option value="Android">Android</option>
+                  <option value="iOS">iOS</option>
+                  <option value="Web">Web</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="tool-options">
+              <label>
+                <span class="lang-en">Maximum input per file</span>
+                <span class="lang-zh">单个输入文件上限</span>
+                <select id="apply-max-input">
+                  <option value="16777216">16 MiB</option>
+                  <option value="67108864" selected>64 MiB</option>
+                  <option value="134217728">128 MiB</option>
+                  <option value="268435456">256 MiB</option>
+                  <option value="">{{NO_LIMIT_LABEL}}</option>
+                </select>
+              </label>
+              <label>
+                <span class="lang-en">Maximum restored output</span>
+                <span class="lang-zh">还原结果上限</span>
+                <select id="apply-max-output">
+                  <option value="33554432">32 MiB</option>
+                  <option value="134217728" selected>128 MiB</option>
+                  <option value="268435456">256 MiB</option>
+                  <option value="536870912">512 MiB</option>
+                  <option value="">{{NO_LIMIT_LABEL}}</option>
+                </select>
+              </label>
+              <div class="memory-note">
+                <strong class="lang-en">Verify before distribution</strong>
+                <strong class="lang-zh">分发前完成验证</strong>
+                <span class="lang-en"
+                  >The format does not authenticate its baseline or
+                  target.</span
+                >
+                <span class="lang-zh"
+                  >补丁格式本身不会认证基线或目标文件。</span
+                >
+              </div>
+            </div>
+
+            <div class="tool-actions">
+              <button
+                id="apply-run"
+                class="primary-button tool-run"
+                type="button"
+              >
+                <span class="lang-en">Apply &amp; verify patch</span>
+                <span class="lang-zh">应用并验证补丁</span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <button
+                id="apply-cancel"
+                class="secondary-button danger-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Cancel active</span>
+                <span class="lang-zh">取消当前操作</span>
+              </button>
+              <button id="apply-reset" class="secondary-button" type="button">
+                <span class="lang-en">Reset</span>
+                <span class="lang-zh">重置</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="tool-result" aria-live="polite">
+            <header>
+              <span class="lang-en">Result / verification report</span>
+              <span class="lang-zh">结果 / 验证报告</span>
+              <strong id="apply-status" class="tool-status" data-state="idle"
+                >{{READY_LABEL}}</strong
+              >
+            </header>
+            <div class="tool-metrics">
+              <div>
+                <span class="lang-en">Restored size</span
+                ><span class="lang-zh">还原大小</span
+                ><strong id="apply-target-size">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Patch size</span
+                ><span class="lang-zh">补丁大小</span
+                ><strong id="apply-patch-size">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Runtime</span
+                ><span class="lang-zh">运行耗时</span
+                ><strong id="apply-runtime">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Verification</span
+                ><span class="lang-zh">验证结果</span
+                ><strong id="apply-verification">—</strong>
+              </div>
+            </div>
+            <pre
+              class="tool-report"
+            ><code id="apply-report">{{REPORT_EMPTY}}</code></pre>
+            <div class="result-actions">
+              <button
+                id="apply-download"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Download restored</span>
+                <span class="lang-zh">下载还原文件</span>
+              </button>
+              <button
+                id="apply-copy-report"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Copy report</span>
+                <span class="lang-zh">复制报告</span>
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <section
+          id="inspect-panel"
+          class="tool-panel"
+          role="tabpanel"
+          aria-labelledby="inspect-tab"
+          data-tool-panel="inspect"
+          hidden
+        >
+          <div class="tool-panel-main">
+            <header class="tool-panel-header">
+              <div>
+                <span class="tool-step">03 / HEADER</span>
+                <h3 class="lang-en">Inspect patch structure</h3>
+                <h3 class="lang-zh">检查补丁结构</h3>
+              </div>
+              <p class="lang-en">
+                Read the 24-byte header, target size, payload size, and SHA-256
+                without applying the patch. This is a structural check—not a
+                substitute for applying the patch and verifying the target.
+              </p>
+              <p class="lang-zh">
+                无需应用补丁即可读取 24 字节头、目标大小、负载大小和
+                SHA-256。这只是结构检查，不能替代应用补丁并验证目标文件。
+              </p>
+            </header>
+
+            <div class="file-grid inspect-file-grid">
+              <label class="file-drop" data-file-drop for="inspect-patch-file">
+                <input
+                  id="inspect-patch-file"
+                  type="file"
+                  accept=".patch,application/octet-stream"
+                />
+                <span class="file-drop-number">01</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">Patch to inspect</strong>
+                  <strong class="lang-zh">要检查的补丁</strong>
+                  <span class="lang-en">ENDSLEY/BSDIFF43 expected</span>
+                  <span class="lang-zh">应为 ENDSLEY/BSDIFF43 格式</span>
+                </span>
+                <output data-file-summary="inspect-patch-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+            </div>
+
+            <div class="tool-actions">
+              <button
+                id="inspect-run"
+                class="primary-button tool-run"
+                type="button"
+              >
+                <span class="lang-en">Inspect patch</span>
+                <span class="lang-zh">检查补丁</span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <button id="inspect-reset" class="secondary-button" type="button">
+                <span class="lang-en">Reset</span>
+                <span class="lang-zh">重置</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="tool-result" aria-live="polite">
+            <header>
+              <span class="lang-en">Result / structural report</span>
+              <span class="lang-zh">结果 / 结构报告</span>
+              <strong id="inspect-status" class="tool-status" data-state="idle"
+                >{{READY_LABEL}}</strong
+              >
+            </header>
+            <div class="tool-metrics">
+              <div>
+                <span class="lang-en">Format</span
+                ><span class="lang-zh">格式</span
+                ><strong id="inspect-format">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Declared target</span
+                ><span class="lang-zh">声明目标大小</span
+                ><strong id="inspect-target-size">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Patch size</span
+                ><span class="lang-zh">补丁大小</span
+                ><strong id="inspect-patch-size">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Patch / target</span
+                ><span class="lang-zh">补丁 / 目标</span
+                ><strong id="inspect-ratio">—</strong>
+              </div>
+            </div>
+            <pre
+              class="tool-report"
+            ><code id="inspect-report">{{REPORT_EMPTY}}</code></pre>
+            <div class="result-actions">
+              <button
+                id="inspect-copy-report"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Copy report</span>
+                <span class="lang-zh">复制报告</span>
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <section class="tool-code-section" aria-labelledby="tool-code-title">
+          <header>
+            <div>
+              <p class="section-kicker">
+                <span class="lang-en">Use this in your app</span>
+                <span class="lang-zh">在应用中使用</span>
+              </p>
+              <h3 id="tool-code-title">
+                <span id="code-operation-name">Create Patch</span>
+              </h3>
+            </div>
+            <div
+              class="code-platform-tabs"
+              role="group"
+              aria-label="Code platform"
+            >
+              <button
+                type="button"
+                aria-pressed="true"
+                data-code-platform="web"
+              >
+                Web
+              </button>
+              <button
+                type="button"
+                aria-pressed="false"
+                data-code-platform="native"
+              >
+                React Native
+              </button>
+            </div>
+          </header>
+          <div class="code-window tool-code-window">
+            <div class="window-bar">
+              <span id="tool-code-filename">browser.ts</span>
+              <button id="copy-tool-code" class="code-copy" type="button">
+                {{COPY_LABEL}}
+              </button>
+            </div>
+            <pre><code id="tool-code"></code></pre>
+          </div>
+        </section>
+      </section>
+
+      <section class="tool-safety" aria-labelledby="tool-safety-title">
+        <div>
+          <p class="section-kicker">
+            <span class="lang-en">Production boundaries</span>
+            <span class="lang-zh">生产边界</span>
+          </p>
+          <h2 id="tool-safety-title">
+            <span class="lang-en">The tool proves bytes—not trust.</span>
+            <span class="lang-zh">工具可以证明字节一致，但不能建立信任。</span>
+          </h2>
+        </div>
+        <ul>
+          <li>
+            <strong class="lang-en">Authenticate manifests</strong>
+            <strong class="lang-zh">认证更新清单</strong>
+            <span class="lang-en"
+              >Carry trusted baseline, target, and patch digests outside the
+              patch format.</span
+            >
+            <span class="lang-zh"
+              >在补丁格式之外携带可信的基线、目标和补丁摘要。</span
+            >
+          </li>
+          <li>
+            <strong class="lang-en">Keep explicit limits</strong>
+            <strong class="lang-zh">保留明确限制</strong>
+            <span class="lang-en"
+              >The current adapters operate on complete in-memory buffers.</span
+            >
+            <span class="lang-zh"
+              >当前适配器使用完整的内存缓冲区执行操作。</span
+            >
+          </li>
+          <li>
+            <strong class="lang-en">Verify restored bytes</strong>
+            <strong class="lang-zh">验证还原结果</strong>
+            <span class="lang-en"
+              >A valid header alone does not prove that compressed patch data is
+              intact.</span
+            >
+            <span class="lang-zh"
+              >仅补丁头有效，不能证明压缩补丁数据完整。</span
+            >
+          </li>
+        </ul>
+        <a class="primary-link" href="{{RECIPES_PATH}}">
+          <span class="lang-en">Read production recipes →</span>
+          <span class="lang-zh">阅读生产实践 →</span>
+        </a>
+      </section>
+    </main>
+
+    <footer class="site-footer shell">
+      <div class="brand footer-brand">
+        <span class="brand-mark" aria-hidden="true">BΔ</span>
+        <span>react-native-bs-diff-patch</span>
+      </div>
+      <p>{{FOOTER_TEXT}}</p>
+      <nav aria-label="{{FOOTER_NAVIGATION_LABEL}}">
+        <a href="{{HOME_PATH}}">{{HOME_LABEL}}</a>
+        <a href="{{DOCS_PATH}}">{{DOCS_LABEL}}</a>
+        <a href="https://www.npmjs.com/package/react-native-bs-diff-patch"
+          >npm</a
+        >
+        <a href="https://github.com/JimmyDaddy/react-native-bs-diff-patch"
+          >GitHub</a
+        >
+      </nav>
+    </footer>
+
+    <script type="module" src="/assets/tools.js"></script>
+    <script src="/assets/site.js" defer></script>
+  </body>
+</html>

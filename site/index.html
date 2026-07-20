@@ -41,6 +41,11 @@
       content="Binary patches everywhere React Native runs: Android, iOS, and Web"
     />
     <link rel="canonical" href="https://bs-dff-patch.corerobin.com/" />
+    <link
+      rel="alternate"
+      hreflang="zh-CN"
+      href="https://bs-dff-patch.corerobin.com/zh-CN/"
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -61,9 +66,18 @@
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
         <a href="#playground">Playground</a>
+        <a href="./tools/">Tools</a>
         <a href="#architecture">Architecture</a>
         <a href="#evidence">Evidence</a>
         <a href="./docs/">Docs</a>
+        <a
+          class="language-switch"
+          href="./zh-CN/"
+          hreflang="zh-CN"
+          lang="zh-CN"
+        >
+          中文
+        </a>
         <a
           class="github-link"
           href="https://github.com/JimmyDaddy/react-native-bs-diff-patch"
@@ -78,6 +92,8 @@
         type="button"
         aria-expanded="false"
         aria-label="Open navigation"
+        data-closed-label="Menu"
+        data-open-label="Close"
       >
         Menu
       </button>
@@ -516,6 +532,8 @@ cancelButton.onclick = () =&gt; controller.abort();
       <p>MIT licensed. Built for React Native runtimes.</p>
       <nav aria-label="Footer navigation">
         <a href="./docs/">Docs</a>
+        <a href="./tools/">Tools</a>
+        <a href="./zh-CN/" hreflang="zh-CN" lang="zh-CN">中文</a>
         <a href="https://www.npmjs.com/package/react-native-bs-diff-patch"
           >npm</a
         >
