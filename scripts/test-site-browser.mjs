@@ -134,6 +134,120 @@ try {
     `mobile layout overflows by ${mobile.scrollWidth - mobile.clientWidth}px`
   );
 
+  await page.goto(`${baseUrl}/zh-CN/`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#runtime-state[data-state="ready"]');
+  assert.equal(await page.$eval('html', (element) => element.lang), 'zh-CN');
+  assert.match(
+    await page.$eval('h1', (element) => element.textContent || ''),
+    /二进制差量/
+  );
+  assert.equal(
+    await page.$eval('a[hreflang="en"]', (element) =>
+      element.textContent.trim()
+    ),
+    'English'
+  );
+
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  await page.goto(`${baseUrl}/tools/`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#tool-runtime-state[data-state="ready"]');
+
+  const fixtures = await page.evaluate(async () => {
+    const encoder = new TextEncoder();
+    const oldBytes = encoder.encode('release=1\nfeatures=native\n');
+    const newBytes = encoder.encode('release=2\nfeatures=native,web\n');
+    const { diffBytes } = await import('/web/index.mjs');
+    const patch = await diffBytes(oldBytes, newBytes);
+    return {
+      oldBytes: [...oldBytes],
+      newBytes: [...newBytes],
+      patch: [...patch],
+    };
+  });
+
+  const selectFile = async (selector, bytes, filename) => {
+    await page.evaluate(
+      ({ inputSelector, fileBytes, fileName }) => {
+        const input = document.querySelector(inputSelector);
+        const transfer = new DataTransfer();
+        transfer.items.add(
+          new File([new Uint8Array(fileBytes)], fileName, {
+            type: 'application/octet-stream',
+          })
+        );
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      { inputSelector: selector, fileBytes: bytes, fileName: filename }
+    );
+  };
+
+  await selectFile('#create-old-file', fixtures.oldBytes, 'release-v1.bin');
+  await selectFile('#create-new-file', fixtures.newBytes, 'release-v2.bin');
+  await page.click('#create-run');
+  await page.waitForSelector('#create-status[data-state="success"]', {
+    timeout: 30_000,
+  });
+  assert.match(
+    await page.$eval('#create-report', (element) => element.textContent || ''),
+    /Byte-for-byte match: PASS/
+  );
+  assert.notEqual(
+    await page.$eval('#create-patch-size', (element) => element.textContent),
+    '—'
+  );
+
+  await page.click('#apply-tab');
+  await selectFile('#apply-old-file', fixtures.oldBytes, 'release-v1.bin');
+  await selectFile('#apply-patch-file', fixtures.patch, 'release-v2.patch');
+  await selectFile('#apply-expected-file', fixtures.newBytes, 'release-v2.bin');
+  await page.select('#apply-origin', 'Android');
+  await page.click('#apply-run');
+  await page.waitForSelector('#apply-status[data-state="success"]', {
+    timeout: 30_000,
+  });
+  assert.match(
+    await page.$eval('#apply-report', (element) => element.textContent || ''),
+    /Generated on: Android[\s\S]*Byte-for-byte match: PASS/
+  );
+
+  await page.click('#inspect-tab');
+  await selectFile('#inspect-patch-file', fixtures.patch, 'release-v2.patch');
+  await page.click('#inspect-run');
+  await page.waitForSelector('#inspect-status[data-state="success"]');
+  assert.equal(
+    await page.$eval('#inspect-format', (element) => element.textContent),
+    'ENDSLEY/BSDIFF43'
+  );
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.reload({ waitUntil: 'networkidle0' });
+  const toolsMobile = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  assert.ok(
+    toolsMobile.scrollWidth <= toolsMobile.clientWidth + 1,
+    `tools mobile layout overflows by ${
+      toolsMobile.scrollWidth - toolsMobile.clientWidth
+    }px`
+  );
+
+  await page.goto(`${baseUrl}/zh-CN/tools/`, {
+    waitUntil: 'networkidle0',
+  });
+  assert.equal(await page.$eval('html', (element) => element.lang), 'zh-CN');
+  assert.match(
+    await page.$eval('h1', (element) => element.textContent || ''),
+    /二进制补丁工具/
+  );
+  assert.equal(
+    await page.$eval('a[hreflang="en"]', (element) =>
+      element.textContent.trim()
+    ),
+    'English'
+  );
+
   await page.goto(`${baseUrl}/docs/api-reference/`, {
     waitUntil: 'networkidle0',
   });
@@ -155,7 +269,9 @@ try {
     'English'
   );
   assert.equal(pageErrors.length, 0, pageErrors.join('\n'));
-  console.log('Site Playground, bilingual docs, and mobile viewport passed');
+  console.log(
+    'Site Playground, Binary Patch Toolkit, localization, and mobile viewport passed'
+  );
 } finally {
   await browser.close();
   await new Promise((resolve, reject) =>

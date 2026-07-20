@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://bs-dff-patch.corerobin.com/</loc></url>
+  <url><loc>https://bs-dff-patch.corerobin.com/zh-CN/</loc></url>
+  <url><loc>https://bs-dff-patch.corerobin.com/tools/</loc></url>
+  <url><loc>https://bs-dff-patch.corerobin.com/zh-CN/tools/</loc></url>
   <url><loc>https://bs-dff-patch.corerobin.com/docs/</loc></url>
   <url><loc>https://bs-dff-patch.corerobin.com/docs/getting-started/</loc></url>
   <url><loc>https://bs-dff-patch.corerobin.com/docs/api-reference/</loc></url>

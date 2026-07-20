@@ -22,11 +22,15 @@ const requiredFiles = [
   'assets/site.css',
   'assets/site.js',
   'assets/playground.js',
+  'assets/tools.js',
   'assets/social-preview.png',
   'web/index.mjs',
   'web/worker.mjs',
   'web/operations.mjs',
   'web/bsdiffpatch.mjs',
+  'zh-CN/index.html',
+  'tools/index.html',
+  'zh-CN/tools/index.html',
   'docs/index.html',
   'docs/getting-started/index.html',
   'docs/api-reference/index.html',
@@ -55,6 +59,18 @@ for (const relativePath of requiredFiles) {
 assert.equal(
   (await readFile(path.join(outputDirectory, 'CNAME'), 'utf8')).trim(),
   'bs-dff-patch.corerobin.com'
+);
+assert.match(
+  await readFile(path.join(outputDirectory, 'sitemap.xml'), 'utf8'),
+  /https:\/\/bs-dff-patch\.corerobin\.com\/zh-CN\//
+);
+assert.match(
+  await readFile(path.join(outputDirectory, 'sitemap.xml'), 'utf8'),
+  /https:\/\/bs-dff-patch\.corerobin\.com\/tools\//
+);
+assert.match(
+  await readFile(path.join(outputDirectory, 'sitemap.xml'), 'utf8'),
+  /https:\/\/bs-dff-patch\.corerobin\.com\/zh-CN\/tools\//
 );
 
 async function htmlFiles(directory) {
@@ -170,6 +186,10 @@ assert.match(
 );
 assert.match(homepage, /<link rel="icon" href="\/favicon\.svg"/);
 assert.match(homepage, /<link rel="manifest" href="\/site\.webmanifest"/);
+assert.match(
+  homepage,
+  /<link\s+rel="alternate"\s+hreflang="zh-CN"\s+href="https:\/\/bs-dff-patch\.corerobin\.com\/zh-CN\/"/
+);
 assert.match(homepage, /id="playground"/);
 assert.match(homepage, /id="generate-patch"/);
 assert.match(homepage, /id="cancel-operation"/);
@@ -184,6 +204,51 @@ assert.match(homepage, /125 KiB packed/);
 assert.match(homepage, /459 KiB unpacked · 58 files/);
 assert.match(homepage, /30,697\.5 ms/);
 assert.match(homepage, /assets\/playground\.js/);
+
+const chineseHomepage = await readFile(
+  path.join(outputDirectory, 'zh-CN/index.html'),
+  'utf8'
+);
+assert.match(chineseHomepage, /<html lang="zh-CN">/);
+assert.match(
+  chineseHomepage,
+  /<link rel="canonical" href="https:\/\/bs-dff-patch\.corerobin\.com\/zh-CN\/"/
+);
+assert.match(chineseHomepage, /二进制差量。/);
+assert.match(chineseHomepage, /href="\.\.\/docs\/zh-CN\/">文档</);
+assert.match(chineseHomepage, /href="\.\.\/"\s+hreflang="en"/);
+assert.match(chineseHomepage, /href="\.\.\/assets\/site\.css"/);
+assert.doesNotMatch(chineseHomepage, /Binary deltas\./);
+
+const toolsPage = await readFile(
+  path.join(outputDirectory, 'tools/index.html'),
+  'utf8'
+);
+assert.match(toolsPage, /<html lang="en">/);
+assert.match(
+  toolsPage,
+  /<link\s+rel="canonical"\s+href="https:\/\/bs-dff-patch\.corerobin\.com\/tools\/"/
+);
+assert.match(toolsPage, /id="create-panel"/);
+assert.match(toolsPage, /id="apply-panel"/);
+assert.match(toolsPage, /id="inspect-panel"/);
+assert.match(toolsPage, /id="apply-expected-sha256"/);
+assert.match(toolsPage, /id="tool-code"/);
+assert.match(toolsPage, /assets\/tools\.js/);
+assert.match(toolsPage, /Your files stay in this browser/);
+
+const chineseToolsPage = await readFile(
+  path.join(outputDirectory, 'zh-CN/tools/index.html'),
+  'utf8'
+);
+assert.match(chineseToolsPage, /<html lang="zh-CN">/);
+assert.match(
+  chineseToolsPage,
+  /<link\s+rel="canonical"\s+href="https:\/\/bs-dff-patch\.corerobin\.com\/zh-CN\/tools\/"/
+);
+assert.match(chineseToolsPage, /二进制补丁工具/);
+assert.match(chineseToolsPage, /href="\/tools\/"\s+hreflang="en"/);
+assert.doesNotMatch(chineseToolsPage, /\{\{[A-Z0-9_]+\}\}/);
 
 function pngDimensions(buffer) {
   assert.equal(buffer.toString('ascii', 1, 4), 'PNG');

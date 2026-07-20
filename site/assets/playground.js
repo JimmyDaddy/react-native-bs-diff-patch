@@ -21,6 +21,34 @@ const maxOutputBytes = document.querySelector('#max-output-bytes');
 const operationPhase = document.querySelector('#operation-phase');
 const operationPercent = document.querySelector('#operation-percent');
 const operationProgress = document.querySelector('#operation-progress');
+const localized = document.documentElement.lang === 'zh-CN';
+const ui = localized
+  ? {
+      cancelled: '已取消',
+      complete: '完成',
+      diffing: '生成差量',
+      generating: '正在通过 Web Worker 生成补丁…',
+      limitRejected: '超过已配置的资源限制',
+      operationFailed: '补丁操作失败',
+      runtimeReady: 'WASM 已就绪',
+      cancellationRequested: '已请求取消…',
+      verifying: '验证结果',
+      verified: '往返结果已逐字节验证',
+      rejected: '已拒绝',
+    }
+  : {
+      cancelled: 'Cancelled',
+      complete: 'Complete',
+      diffing: 'Diffing',
+      generating: 'Generating patch in the Web Worker…',
+      limitRejected: 'The configured resource limit was exceeded',
+      operationFailed: 'The patch operation failed',
+      runtimeReady: 'WASM ready',
+      cancellationRequested: 'Cancellation requested…',
+      verifying: 'Verifying',
+      verified: 'Round trip verified byte-for-byte',
+      rejected: 'Rejected',
+    };
 
 let currentPatch;
 let activeController;
@@ -75,14 +103,14 @@ async function generatePatch() {
     maxInputBytes: selectedLimit(maxInputBytes),
     maxOutputBytes: selectedLimit(maxOutputBytes),
   };
-  setProgress('Diffing', 0.2);
-  setStatus('running', 'Generating patch in the Web Worker…');
+  setProgress(ui.diffing, 0.2);
+  setStatus('running', ui.generating);
 
   const startedAt = performance.now();
 
   try {
     const patchData = await diffBytes(oldData, newData, options);
-    setProgress('Verifying', 0.65);
+    setProgress(ui.verifying, 0.65);
     const restoredData = await patchBytes(oldData, patchData, options);
 
     if (!bytesEqual(restoredData, newData)) {
@@ -104,8 +132,8 @@ async function generatePatch() {
     runtimeMs.textContent = `${elapsed.toFixed(2)} ms`;
     errorCode.textContent = '—';
     downloadButton.disabled = false;
-    setProgress('Complete', 1);
-    setStatus('success', 'Round trip verified byte-for-byte');
+    setProgress(ui.complete, 1);
+    setStatus('success', ui.verified);
   } catch (error) {
     currentPatch = undefined;
     patchSize.textContent = '—';
@@ -116,12 +144,16 @@ async function generatePatch() {
         ? String(error.code)
         : 'EUNKNOWN';
     errorCode.textContent = code;
-    setProgress(code === 'EABORTED' ? 'Cancelled' : 'Rejected', 0);
+    setProgress(code === 'EABORTED' ? ui.cancelled : ui.rejected, 0);
     setStatus(
       'error',
-      error instanceof Error
+      localized && code === 'EABORTED'
+        ? `[${code}] ${ui.cancelled}`
+        : localized && code === 'ERESOURCE'
+        ? `[${code}] ${ui.limitRejected}`
+        : error instanceof Error
         ? `[${code}] ${error.message}`
-        : `[${code}] The patch operation failed`
+        : `[${code}] ${ui.operationFailed}`
     );
   } finally {
     activeController = undefined;
@@ -135,7 +167,7 @@ function cancelOperation() {
   if (!activeController) return;
   activeController.abort();
   cancelButton.disabled = true;
-  setStatus('running', 'Cancellation requested…');
+  setStatus('running', ui.cancellationRequested);
 }
 
 function downloadPatch() {
@@ -161,4 +193,4 @@ downloadButton.addEventListener('click', downloadPatch);
 
 updateInputSizes();
 runtimeState.dataset.state = 'ready';
-runtimeState.textContent = 'WASM ready';
+runtimeState.textContent = ui.runtimeReady;
