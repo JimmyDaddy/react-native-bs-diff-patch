@@ -15,12 +15,52 @@ const mockStartPatch = jest.fn<
 const mockCancel = jest.fn<Promise<boolean>, [string]>(() =>
   Promise.resolve(true)
 );
+const validMetadata = {
+  declaredTargetBytes: '7',
+  format: 'ENDSLEY/BSDIFF43',
+  headerBytes: 24,
+  patchBytes: 42,
+  payloadBytes: 18,
+  valid: true,
+} as const;
+const mockInspectPatch = jest.fn<Promise<string>, [string, number]>(() =>
+  Promise.resolve(JSON.stringify(validMetadata))
+);
+const mockVerifyPatch = jest.fn<
+  Promise<string>,
+  [string, string, string, number, number]
+>(() =>
+  Promise.resolve(
+    JSON.stringify({
+      expectedBytes: 7,
+      patch: validMetadata,
+      restoredBytes: 7,
+      verified: true,
+    })
+  )
+);
 
 jest.mock('../NativeBsDiffPatch', () => ({
   patch: (oldFile: string, newFile: string, patchFile: string) =>
     mockPatch(oldFile, newFile, patchFile),
   diff: (oldFile: string, newFile: string, patchFile: string) =>
     mockDiff(oldFile, newFile, patchFile),
+  inspectPatch: (patchFile: string, maxInputBytes: number) =>
+    mockInspectPatch(patchFile, maxInputBytes),
+  verifyPatch: (
+    oldFile: string,
+    patchFile: string,
+    expectedFile: string,
+    maxInputBytes: number,
+    maxOutputBytes: number
+  ) =>
+    mockVerifyPatch(
+      oldFile,
+      patchFile,
+      expectedFile,
+      maxInputBytes,
+      maxOutputBytes
+    ),
   startDiff: (
     id: string,
     oldFile: string,
@@ -61,10 +101,12 @@ jest.mock('../NativeBsDiffPatch', () => ({
 import {
   diff,
   diffBytes,
+  inspectPatch,
   patch,
   patchBytes,
   startDiff,
   startPatch,
+  verifyPatch,
 } from '../index';
 import { NativeEventEmitter } from 'react-native';
 
@@ -75,6 +117,8 @@ describe('BsDiffPatch TurboModule facade', () => {
     mockStartDiff.mockClear();
     mockStartPatch.mockClear();
     mockCancel.mockClear();
+    mockInspectPatch.mockClear();
+    mockVerifyPatch.mockClear();
   });
 
   it('delegates diff arguments and result', async () => {
@@ -128,6 +172,38 @@ describe('BsDiffPatch TurboModule facade', () => {
       startPatch('old', 'new', 'patch', { maxInputBytes: 0 })
     ).toThrow('maxInputBytes must be a positive safe integer');
     expect(mockStartPatch).not.toHaveBeenCalled();
+  });
+
+  it('inspects native patch metadata and preserves exact target bytes', async () => {
+    await expect(
+      inspectPatch('release.patch', { maxInputBytes: 1024 })
+    ).resolves.toEqual(validMetadata);
+    expect(mockInspectPatch).toHaveBeenCalledWith('release.patch', 1024);
+  });
+
+  it('verifies native paths through a temporary output', async () => {
+    await expect(
+      verifyPatch('old.bin', 'release.patch', 'expected.bin', {
+        maxInputBytes: 1024,
+        maxOutputBytes: 2048,
+      })
+    ).resolves.toMatchObject({ verified: true, restoredBytes: 7 });
+    expect(mockVerifyPatch).toHaveBeenCalledWith(
+      'old.bin',
+      'release.patch',
+      'expected.bin',
+      1024,
+      2048
+    );
+  });
+
+  it('rejects binary metadata inputs on native', async () => {
+    await expect(inspectPatch(new Uint8Array([1]))).rejects.toMatchObject({
+      code: 'EUNSUPPORTED',
+    });
+    await expect(
+      verifyPatch(new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3]))
+    ).rejects.toMatchObject({ code: 'EUNSUPPORTED' });
   });
 
   it('filters progress by job and returns a working unsubscribe function', () => {

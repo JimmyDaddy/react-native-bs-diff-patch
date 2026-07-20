@@ -4,6 +4,14 @@ import { TurboModuleRegistry } from 'react-native';
 export interface Spec extends TurboModule {
   patch(oldFile: string, newFile: string, patchFile: string): Promise<number>;
   diff(oldFile: string, newFile: string, patchFile: string): Promise<number>;
+  inspectPatch(patchFile: string, maxInputBytes: number): Promise<string>;
+  verifyPatch(
+    oldFile: string,
+    patchFile: string,
+    expectedFile: string,
+    maxInputBytes: number,
+    maxOutputBytes: number
+  ): Promise<string>;
   startPatch(
     jobId: string,
     oldFile: string,

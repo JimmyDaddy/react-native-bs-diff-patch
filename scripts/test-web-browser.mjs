@@ -86,11 +86,14 @@ try {
     inputsPreserved: true,
     inputLimitErrorCode: 'ERESOURCE',
     invalidInputErrorCode: 'EINVAL',
+    metadataFormat: 'ENDSLEY/BSDIFF43',
+    mismatchVerified: false,
     outputLimitErrorCode: 'ERESOURCE',
     patchLength: result.patchLength,
     pathApiErrorCode: 'EUNSUPPORTED',
     restoredMatches: true,
     sharedSurvivedAbort: true,
+    verificationPassed: true,
   });
   assert.ok(result.patchLength > 24);
   console.log('Browser Web Worker diff/patch round trip passed');

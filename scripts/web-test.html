@@ -11,7 +11,13 @@
       <p id="status">Running…</p>
     </main>
     <script type="module">
-      import { diff, diffBytes, patchBytes } from '../web/index.mjs';
+      import {
+        diff,
+        diffBytes,
+        inspectPatch,
+        patchBytes,
+        verifyPatch,
+      } from '../web/index.mjs';
 
       const status = document.querySelector('#status');
       const encoder = new TextEncoder();
@@ -24,6 +30,13 @@
       try {
         const patchData = await diffBytes(new Blob([oldData]), newData);
         const restoredData = await patchBytes(oldData.buffer, patchData);
+        const metadata = await inspectPatch(patchData);
+        const verification = await verifyPatch(oldData, patchData, newData);
+        const mismatch = await verifyPatch(
+          oldData,
+          patchData,
+          encoder.encode('not the target')
+        );
         const restoredMatches =
           restoredData.length === newData.length &&
           restoredData.every((value, index) => value === newData[index]);
@@ -101,6 +114,10 @@
           invalidInputErrorCode !== 'EINVAL' ||
           outputLimitErrorCode !== 'ERESOURCE' ||
           pathApiErrorCode !== 'EUNSUPPORTED' ||
+          metadata.format !== 'ENDSLEY/BSDIFF43' ||
+          metadata.declaredTargetBytes !== String(newData.byteLength) ||
+          !verification.verified ||
+          mismatch.verified ||
           !sharedSurvivedAbort
         ) {
           throw new Error('browser assertions failed');
@@ -112,11 +129,14 @@
           inputsPreserved,
           inputLimitErrorCode,
           invalidInputErrorCode,
+          metadataFormat: metadata.format,
+          mismatchVerified: mismatch.verified,
           outputLimitErrorCode,
           patchLength: patchData.length,
           pathApiErrorCode,
           restoredMatches,
           sharedSurvivedAbort,
+          verificationPassed: verification.verified,
         };
         document.body.dataset.status = 'passed';
         status.textContent = 'Passed';

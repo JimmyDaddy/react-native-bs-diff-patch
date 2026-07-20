@@ -21,6 +21,7 @@
 <p align="center">
   <a href="https://bs-dff-patch.corerobin.com/docs/zh-CN/">中文文档</a> ·
   <a href="https://bs-dff-patch.corerobin.com/#playground">在线 Playground</a> ·
+  <a href="https://bs-dff-patch.corerobin.com/zh-CN/tools/">二进制补丁工具箱</a> ·
   <a href="./README.md">English</a> ·
   <a href="https://www.npmjs.com/package/react-native-bs-diff-patch">npm</a>
 </p>
@@ -47,15 +48,17 @@
 - **可控制高成本任务：** 原生 job 支持进度、协作式取消、输入/输出限制，并避免
   暴露未完成的输出文件。
 - **Web 无需补丁服务：** 差分和还原完全在浏览器本地执行。
+- **检查并证明兼容性：** 原生与 Web 使用相同 API 读取补丁元数据，并验证还原字节。
 
 ## 平台概览
 
-|          | Android / iOS                  | React Native Web                                |
-| -------- | ------------------------------ | ----------------------------------------------- |
-| 输入     | 绝对文件路径                   | `ArrayBuffer`、TypedArray、`DataView` 或 `Blob` |
-| 基础 API | `diff()` / `patch()`           | `diffBytes()` / `patchBytes()`                  |
-| 可控 API | `startDiff()` / `startPatch()` | `AbortSignal` 与二进制大小限制                  |
-| 执行核心 | JNI / ObjC++ 调用原生 C        | WASM Worker 运行同一 C 核心                     |
+|          | Android / iOS                             | React Native Web                                |
+| -------- | ----------------------------------------- | ----------------------------------------------- |
+| 输入     | 绝对文件路径                              | `ArrayBuffer`、TypedArray、`DataView` 或 `Blob` |
+| 基础 API | `diff()` / `patch()`                      | `diffBytes()` / `patchBytes()`                  |
+| 可控 API | `startDiff()` / `startPatch()`            | `AbortSignal` 与二进制大小限制                  |
+| 验证能力 | 路径版 `inspectPatch()` / `verifyPatch()` | 相同 API 的二进制输入                           |
+| 执行核心 | JNI / ObjC++ 调用原生 C                   | WASM Worker 运行同一 C 核心                     |
 
 ## 安装
 
@@ -134,17 +137,43 @@ const restoredBytes = await patchBytes(oldBytes, patchBytesValue, {
 Web API 返回新的 `Uint8Array`，不会转移或失效调用方的缓冲区。主动取消以
 `EABORTED` 拒绝；命中二进制大小限制时以 `ERESOURCE` 拒绝。
 
+## 检查并验证补丁
+
+先用 `inspectPatch()` 完成低成本结构检查，再用 `verifyPatch()` 将补丁应用到临时
+结果，并与预期目标逐字节比较：
+
+```ts
+import { inspectPatch, verifyPatch } from 'react-native-bs-diff-patch';
+
+// Android / iOS 使用路径；Web 使用 File、Blob、ArrayBuffer 或 TypedArray。
+const metadata = await inspectPatch(patchPath);
+const result = await verifyPatch(oldPath, patchPath, expectedPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+
+if (!metadata.valid || !result.verified) {
+  throw new Error('补丁兼容性验证失败');
+}
+```
+
+原生验证产生的临时输出始终会被清理。Web 版本按相同顺序传入 `oldFile`、
+`patchFile` 与 `expectedFile`。结构有效只用于诊断；替换业务数据前仍应认证更新清单
+中的可信哈希。
+
 ## API 矩阵
 
-| API                                        | Android | iOS    | Web    |
-| ------------------------------------------ | ------- | ------ | ------ |
-| `diff(oldPath, newPath, patchPath)`        | 支持    | 支持   | 不支持 |
-| `patch(oldPath, outputPath, patchPath)`    | 支持    | 支持   | 不支持 |
-| `startDiff(...)` / `startPatch(...)`       | 支持    | 支持   | 不支持 |
-| `diffBytes(oldData, newData, options?)`    | 不支持  | 不支持 | 支持   |
-| `patchBytes(oldData, patchData, options?)` | 不支持  | 不支持 | 支持   |
-| 旧架构（限 RN 仍提供时）                   | 支持    | 支持   | 不适用 |
-| 新架构 / TurboModule                       | 支持    | 支持   | 不适用 |
+| API                                           | Android | iOS    | Web    |
+| --------------------------------------------- | ------- | ------ | ------ |
+| `diff(oldPath, newPath, patchPath)`           | 支持    | 支持   | 不支持 |
+| `patch(oldPath, outputPath, patchPath)`       | 支持    | 支持   | 不支持 |
+| `startDiff(...)` / `startPatch(...)`          | 支持    | 支持   | 不支持 |
+| `diffBytes(oldData, newData, options?)`       | 不支持  | 不支持 | 支持   |
+| `patchBytes(oldData, patchData, options?)`    | 不支持  | 不支持 | 支持   |
+| `inspectPatch(path 或 binary, options?)`      | 支持    | 支持   | 支持   |
+| `verifyPatch(old, patch, expected, options?)` | 支持    | 支持   | 支持   |
+| 旧架构（限 RN 仍提供时）                      | 支持    | 支持   | 不适用 |
+| 新架构 / TurboModule                          | 支持    | 支持   | 不适用 |
 
 调用当前平台不可用的 API 会以 `EUNSUPPORTED` 拒绝，不会静默切换成其他输入
 模型。

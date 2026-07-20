@@ -232,8 +232,9 @@ try {
   await writeFile(
     path.join(consumerDirectory, 'browser.mjs'),
     [
-      "import { diffBytes, patch } from 'react-native-bs-diff-patch';",
+      "import { diffBytes, inspectPatch, patch } from 'react-native-bs-diff-patch';",
       "if (typeof diffBytes !== 'function') throw new Error('Missing Web binary API');",
+      "if (typeof inspectPatch !== 'function') throw new Error('Missing patch metadata API');",
       "const error = await patch('old', 'new', 'patch').catch((value) => value);",
       "if (!error || error.code !== 'EUNSUPPORTED') throw new Error('Wrong Web path API');",
     ].join('\n')
@@ -245,9 +246,11 @@ try {
   await writeFile(
     path.join(consumerDirectory, 'consumer.ts'),
     [
-      "import { diffBytes, type BinaryInput } from 'react-native-bs-diff-patch';",
+      "import { diffBytes, inspectPatch, verifyPatch, type BinaryInput, type PatchMetadata } from 'react-native-bs-diff-patch';",
       'const input: BinaryInput = new Uint8Array([1, 2, 3]);',
       'void diffBytes(input, input);',
+      'void inspectPatch(input).then((value: PatchMetadata) => value.valid);',
+      'void verifyPatch(input, input, input).then((value) => value.verified);',
     ].join('\n')
   );
   run(

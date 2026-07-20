@@ -4,6 +4,7 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class BsDiffPatchModuleSupport(
@@ -25,6 +26,47 @@ internal class BsDiffPatchModuleSupport(
   fun diff(oldFile: String, newFile: String, patchFile: String, promise: Promise) {
     taskRunner.execute(promise) {
       BsDiffPatchNative.diff(oldFile, newFile, patchFile)
+    }
+  }
+
+  fun inspectPatch(patchFile: String, maxInputBytes: Double, promise: Promise) {
+    taskRunner.execute(promise) {
+      BsDiffPatchNative.inspectPatch(patchFile, maxInputBytes)
+    }
+  }
+
+  fun verifyPatch(
+    oldFile: String,
+    patchFile: String,
+    expectedFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  ) {
+    taskRunner.execute(promise) {
+      val temporaryOutput = File.createTempFile(
+        "bsdiffpatch-verify-",
+        ".tmp",
+        reactContext.cacheDir
+      )
+      if (!temporaryOutput.delete()) {
+        throw BsDiffPatchException(
+          "EUNSPECIFIED",
+          "could not prepare temporary verification output"
+        )
+      }
+      try {
+        BsDiffPatchNative.verifyPatch(
+          oldFile,
+          patchFile,
+          expectedFile,
+          temporaryOutput.absolutePath,
+          maxInputBytes,
+          maxOutputBytes
+        )
+      } finally {
+        temporaryOutput.delete()
+      }
     }
   }
 

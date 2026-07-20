@@ -25,6 +25,8 @@ The [Chinese documentation](./zh-CN/README.md) mirrors the same public guides.
 - [Architecture](./architecture.md) — execution paths and patch compatibility.
 - [Controllable native operations](./native-operations-v03.md) — resource limits,
   cancellation, progress, and atomic output contract.
+- [Large-file roadmap](./large-files-v04.md) — memory baselines, honest progress,
+  and streaming feasibility for the next architecture iteration.
 - [Troubleshooting](./troubleshooting.md) — common integration failures.
 - [Development](./development.md) — local builds, tests, WebAssembly, and release checks.
 

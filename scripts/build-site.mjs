@@ -52,6 +52,13 @@ const pages = [
     file: 'native-operations-v03.md',
   },
   {
+    slug: 'large-files-v04',
+    title: 'Large-file roadmap',
+    description:
+      'Memory baselines, honest progress semantics, and streaming feasibility for larger inputs.',
+    file: 'large-files-v04.md',
+  },
+  {
     slug: 'troubleshooting',
     title: 'Troubleshooting',
     description:
@@ -103,6 +110,12 @@ const chinesePages = [
     title: '可控制的原生操作',
     description: '原生资源限制、取消、进度与原子输出行为。',
     file: 'native-operations-v03.md',
+  },
+  {
+    slug: 'large-files-v04',
+    title: '大文件演进路线',
+    description: '面向更大输入的内存基线、真实进度语义与流式处理可行性。',
+    file: 'large-files-v04.md',
   },
   {
     slug: 'troubleshooting',
@@ -670,8 +683,8 @@ function localizeHomepage(source) {
     ['New Architecture', '新架构'],
     ['Current matrix anchor', '当前矩阵基准'],
     ['npm tarball', 'npm 安装包'],
-    ['125 KiB packed', '125 KiB 压缩包'],
-    ['459 KiB unpacked · 58 files', '459 KiB 解压后 · 58 个文件'],
+    ['133 KiB packed', '133 KiB 压缩包'],
+    ['500 KiB unpacked · 58 files', '500 KiB 解压后 · 58 个文件'],
     ['WebAssembly reference', 'WebAssembly 参考数据'],
     ['Repeatable, not theoretical.', '可复现，而非纸面数据。'],
     [

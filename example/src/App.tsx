@@ -3,10 +3,12 @@ import * as React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import {
   diff,
+  inspectPatch,
   patch,
   startDiff,
   startPatch,
   type NativeOperationProgress,
+  verifyPatch,
 } from 'react-native-bs-diff-patch';
 import * as FS from 'react-native-fs';
 
@@ -112,6 +114,43 @@ export default function App() {
           crossPlatformFixture.patchBase64,
           'base64'
         );
+        const goldenNewFileInfo = await FS.stat(goldenNewFile);
+        const goldenMetadata = await inspectPatch(goldenPatchFile, {
+          maxInputBytes: 1024 * 1024,
+        });
+        if (
+          !goldenMetadata.valid ||
+          goldenMetadata.format !== 'ENDSLEY/BSDIFF43' ||
+          goldenMetadata.declaredTargetBytes !== String(goldenNewFileInfo.size)
+        ) {
+          throw new Error('native patch metadata did not match the fixture');
+        }
+        const goldenVerification = await verifyPatch(
+          goldenOldFile,
+          goldenPatchFile,
+          goldenNewFile,
+          {
+            maxInputBytes: 1024 * 1024,
+            maxOutputBytes: 1024 * 1024,
+          }
+        );
+        if (
+          !goldenVerification.verified ||
+          goldenVerification.patch.declaredTargetBytes !==
+            String(goldenNewFileInfo.size)
+        ) {
+          throw new Error(
+            'native patch verification did not match the fixture'
+          );
+        }
+        const mismatchVerification = await verifyPatch(
+          goldenOldFile,
+          goldenPatchFile,
+          oldFile
+        );
+        if (mismatchVerification.verified) {
+          throw new Error('native patch verification accepted a wrong target');
+        }
         await diff(goldenOldFile, goldenNewFile, generatedGoldenPatchFile);
         const generatedGoldenPatch = await FS.readFile(
           generatedGoldenPatchFile,
@@ -137,6 +176,44 @@ export default function App() {
           'bm90IGEgYnNkaWZmIHBhdGNo',
           'base64'
         );
+        const corruptMetadata = await inspectPatch(corruptPatchFile);
+        if (
+          corruptMetadata.valid ||
+          corruptMetadata.issue !== 'TRUNCATED_HEADER'
+        ) {
+          throw new Error('native patch inspection accepted a corrupt patch');
+        }
+        const corruptVerificationCode = await verifyPatch(
+          goldenOldFile,
+          corruptPatchFile,
+          goldenNewFile
+        ).then(
+          () => undefined,
+          (error: { code?: string }) => error.code
+        );
+        if (corruptVerificationCode !== 'EPATCH') {
+          throw new Error(
+            `corrupt verification should reject with EPATCH, got ${String(
+              corruptVerificationCode
+            )}`
+          );
+        }
+        const verificationLimitCode = await verifyPatch(
+          goldenOldFile,
+          goldenPatchFile,
+          goldenNewFile,
+          { maxOutputBytes: 1 }
+        ).then(
+          () => undefined,
+          (error: { code?: string }) => error.code
+        );
+        if (verificationLimitCode !== 'ERESOURCE') {
+          throw new Error(
+            `verification limit should reject with ERESOURCE, got ${String(
+              verificationLimitCode
+            )}`
+          );
+        }
         let corruptPatchErrorCode: string | undefined;
         try {
           await patch(goldenOldFile, corruptOutputFile, corruptPatchFile);

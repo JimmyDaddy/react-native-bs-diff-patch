@@ -57,6 +57,8 @@
     "test:native-operations": "sh scripts/test-native-operations.sh",
     "benchmark:web": "node scripts/benchmark-web.mjs",
     "benchmark:native": "node scripts/benchmark-native.mjs",
+    "benchmark:large:web": "BENCHMARK_SIZES_MIB=16,64,128 BENCHMARK_ALLOW_FAILURES=1 node scripts/benchmark-web.mjs",
+    "benchmark:large:native": "BENCHMARK_SIZES_MIB=16,64,128 BENCHMARK_ALLOW_FAILURES=1 node scripts/benchmark-native.mjs",
     "site:build": "node scripts/build-site.mjs",
     "site:test": "node scripts/test-site.mjs",
     "site:test:browser": "node scripts/test-site-browser.mjs",

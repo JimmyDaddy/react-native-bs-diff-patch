@@ -220,6 +220,57 @@ try {
     'ENDSLEY/BSDIFF43'
   );
 
+  await selectFile('#manifest-old-file', fixtures.oldBytes, 'release-v1.bin');
+  await selectFile('#manifest-new-file', fixtures.newBytes, 'release-v2.bin');
+  await selectFile('#manifest-patch-file', fixtures.patch, 'release-v2.patch');
+  await page.click('#manifest-run');
+  await page.waitForSelector('#manifest-status[data-state="success"]');
+  const generatedManifest = JSON.parse(
+    await page.$eval('#manifest-output', (element) => element.textContent || '')
+  );
+  assert.equal(generatedManifest.manifestVersion, 1);
+  assert.equal(generatedManifest.patchFormat, 'ENDSLEY/BSDIFF43');
+  assert.equal(generatedManifest.target.bytes, fixtures.newBytes.length);
+  assert.equal(generatedManifest.target.sha256.length, 64);
+  assert.equal(generatedManifest.patch.sha256.length, 64);
+
+  await page.$eval('#savings-target-mib', (element) => {
+    element.value = '10';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.$eval('#savings-patch-mib', (element) => {
+    element.value = '2';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.$eval('#savings-downloads', (element) => {
+    element.value = '5';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  assert.equal(
+    await page.$eval('#savings-rate', (element) => element.textContent),
+    '80.0%'
+  );
+  assert.equal(
+    await page.$eval('#savings-equivalent', (element) => element.textContent),
+    '4'
+  );
+
+  await page.select('#diagnostic-code', 'ERESOURCE');
+  assert.match(
+    await page.$eval(
+      '#diagnostic-action',
+      (element) => element.textContent || ''
+    ),
+    /maxInputBytes/
+  );
+  assert.match(
+    await page.$eval(
+      '#diagnostic-example',
+      (element) => element.textContent || ''
+    ),
+    /maxOutputBytes/
+  );
+
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await page.reload({ waitUntil: 'networkidle0' });
   const toolsMobile = await page.evaluate(() => ({
