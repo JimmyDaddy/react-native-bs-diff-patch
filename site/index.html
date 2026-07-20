@@ -15,8 +15,36 @@
       content="One compact binary patch format for Android, iOS, and React Native Web."
     />
     <meta property="og:url" content="https://bs-dff-patch.corerobin.com/" />
-    <meta name="twitter:card" content="summary" />
+    <meta
+      property="og:image"
+      content="https://bs-dff-patch.corerobin.com/assets/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:type" content="image/png" />
+    <meta
+      property="og:image:alt"
+      content="Binary patches everywhere React Native runs: Android, iOS, and Web"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="react-native-bs-diff-patch" />
+    <meta
+      name="twitter:description"
+      content="One compact binary patch format for Android, iOS, and React Native Web."
+    />
+    <meta
+      name="twitter:image"
+      content="https://bs-dff-patch.corerobin.com/assets/social-preview.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Binary patches everywhere React Native runs: Android, iOS, and Web"
+    />
     <link rel="canonical" href="https://bs-dff-patch.corerobin.com/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="stylesheet" href="./assets/site.css" />
     <title>
       react-native-bs-diff-patch — Binary patches everywhere RN runs
@@ -194,7 +222,10 @@
               </select>
             </label>
             <div class="operation-progress">
-              <span><strong id="operation-phase">Idle</strong><output id="operation-percent">0%</output></span>
+              <span
+                ><strong id="operation-phase">Idle</strong
+                ><output id="operation-percent">0%</output></span
+              >
               <progress id="operation-progress" max="1" value="0">0%</progress>
             </div>
           </div>
@@ -235,7 +266,9 @@
       <section class="control-showcase" aria-labelledby="controls-title">
         <header>
           <p class="section-kicker">Same controls, explicit contracts</p>
-          <h2 id="controls-title">Progress and cancel on native. AbortSignal on Web.</h2>
+          <h2 id="controls-title">
+            Progress and cancel on native. AbortSignal on Web.
+          </h2>
           <p>
             The playground above executes the browser API. Use the matching
             path-based job facade in Android and iOS applications.
@@ -243,7 +276,9 @@
         </header>
         <div class="control-code-grid">
           <article>
-            <div class="code-label"><span>Android / iOS</span><strong>Native job</strong></div>
+            <div class="code-label">
+              <span>Android / iOS</span><strong>Native job</strong>
+            </div>
             <pre><code><span class="token-keyword">const</span> job = <span class="token-function">startPatch</span>(oldPath, outputPath, patchPath, {
   maxInputBytes: 64 * 1024 * 1024,
   maxOutputBytes: 128 * 1024 * 1024,
@@ -257,7 +292,9 @@ cancelButton.onPress = () =&gt; job.cancel();
 <span class="token-keyword">await</span> job.result.finally(off);</code></pre>
           </article>
           <article>
-            <div class="code-label"><span>React Native Web</span><strong>Worker + signal</strong></div>
+            <div class="code-label">
+              <span>React Native Web</span><strong>Worker + signal</strong>
+            </div>
             <pre><code><span class="token-keyword">const</span> controller = <span class="token-keyword">new</span> AbortController();
 <span class="token-keyword">const</span> options = {
   signal: controller.signal,
@@ -399,8 +436,8 @@ cancelButton.onclick = () =&gt; controller.abort();
           </article>
           <article class="package-footprint">
             <span>npm tarball</span>
-            <strong>122 KiB packed</strong>
-            <p>452 KiB unpacked · 58 files</p>
+            <strong>125 KiB packed</strong>
+            <p>459 KiB unpacked · 58 files</p>
           </article>
         </div>
 

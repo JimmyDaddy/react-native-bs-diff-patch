@@ -363,10 +363,27 @@ function documentationLayout({ slug, title, description, content, items, ui }) {
       title
     )} — react-native-bs-diff-patch" />
     <meta property="og:description" content="${escapeHtml(description)}" />
+    <meta property="og:url" content="https://bs-dff-patch.corerobin.com${canonical}" />
+    <meta property="og:image" content="https://bs-dff-patch.corerobin.com/assets/social-preview.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="Binary patches everywhere React Native runs: Android, iOS, and Web" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(
+      title
+    )} — react-native-bs-diff-patch" />
+    <meta name="twitter:description" content="${escapeHtml(description)}" />
+    <meta name="twitter:image" content="https://bs-dff-patch.corerobin.com/assets/social-preview.png" />
+    <meta name="twitter:image:alt" content="Binary patches everywhere React Native runs: Android, iOS, and Web" />
     <link rel="canonical" href="https://bs-dff-patch.corerobin.com${canonical}" />
     <link rel="alternate" hreflang="${
       ui.alternateLanguage
     }" href="https://bs-dff-patch.corerobin.com${alternate}" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="stylesheet" href="/assets/site.css" />
     <title>${escapeHtml(title)} — react-native-bs-diff-patch</title>
   </head>
@@ -447,6 +464,12 @@ for (const filename of [
   'index.html',
   '404.html',
   'CNAME',
+  'favicon.svg',
+  'favicon-32.png',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'site.webmanifest',
   'robots.txt',
   'sitemap.xml',
 ]) {
