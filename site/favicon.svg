@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="favicon-title">
+  <title id="favicon-title">B delta</title>
+  <rect width="64" height="64" rx="11" fill="#b8ff3d" />
+  <path fill="#060a0d" fill-rule="evenodd" d="M8 11h13c8.5 0 13.5 4 13.5 10.7 0 4.3-2 7.4-5.8 9 4.6 1.5 7 4.9 7 10.1C35.7 48.5 30.4 53 21 53H8V11Zm8 7v9.7h4.8c4 0 6-1.6 6-4.9 0-3.2-2-4.8-6-4.8H16Zm0 16.4V46h5.5c4.3 0 6.4-1.9 6.4-5.8 0-3.8-2.1-5.8-6.4-5.8H16Z" />
+  <path d="m47 14 11 36H36l11-36Z" fill="none" stroke="#060a0d" stroke-linejoin="round" stroke-width="5.5" />
+</svg>

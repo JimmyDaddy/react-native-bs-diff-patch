@@ -1,7 +1,7 @@
 {
   "name": "react-native-bs-diff-patch",
   "version": "0.3.0",
-  "description": "Binary diff and patch support for React Native and React Native Web",
+  "description": "Create and apply compact binary patches across React Native Android, iOS, and Web",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "browser": "web/index.mjs",
@@ -72,6 +72,10 @@
     "react-native",
     "react-native-web",
     "webassembly",
+    "bsdiff",
+    "binary-diff",
+    "binary-patch",
+    "delta-update",
     "ios",
     "android"
   ],

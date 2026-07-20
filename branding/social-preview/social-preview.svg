@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title description">
+  <title id="title">react-native-bs-diff-patch social preview</title>
+  <desc id="description">Binary patches across React Native Android, iOS, and Web.</desc>
+  <defs>
+    <linearGradient id="copy-shade" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#060a0d" stop-opacity="1" />
+      <stop offset="0.48" stop-color="#060a0d" stop-opacity="0.98" />
+      <stop offset="0.69" stop-color="#060a0d" stop-opacity="0.54" />
+      <stop offset="1" stop-color="#060a0d" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="bottom-shade" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0.5" stop-color="#060a0d" stop-opacity="0" />
+      <stop offset="1" stop-color="#060a0d" stop-opacity="0.72" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="#060a0d" />
+  <image href="background.png" width="1280" height="640" preserveAspectRatio="xMidYMid slice" />
+  <rect width="1280" height="640" fill="url(#copy-shade)" />
+  <rect width="1280" height="640" fill="url(#bottom-shade)" />
+  <path d="M48 48H1232V592H48Z" fill="none" stroke="#1c2a30" stroke-width="2" />
+  <path d="M48 116H692" stroke="#1c2a30" stroke-width="2" />
+
+  <g transform="translate(72 68)">
+    <rect width="28" height="28" fill="#b8ff3d" />
+    <text x="14" y="19" fill="#060a0d" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" font-weight="900" text-anchor="middle">BΔ</text>
+    <text x="44" y="19" fill="#eaf2f2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" letter-spacing="-0.5">react-native-bs-diff-patch</text>
+  </g>
+
+  <text x="72" y="210" fill="#39e6ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" letter-spacing="2.4">NATIVE C CORE · WEBASSEMBLY WORKER</text>
+  <text x="72" y="296" fill="#eaf2f2" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="800" letter-spacing="-3.6">Binary patches.</text>
+  <rect x="70" y="320" width="532" height="76" fill="#b8ff3d" />
+  <text x="88" y="378" fill="#060a0d" font-family="Inter, Arial, sans-serif" font-size="55" font-weight="850" letter-spacing="-3">Everywhere RN runs.</text>
+  <text x="72" y="444" fill="#aab9be" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="500">Create a delta. Reconstruct the new file.</text>
+  <text x="72" y="476" fill="#aab9be" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="500">One compatible patch format across every runtime.</text>
+
+  <g transform="translate(72 526)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="700">
+    <rect width="94" height="38" fill="#0a1115" stroke="#34464d" />
+    <circle cx="20" cy="19" r="4" fill="#b8ff3d" />
+    <text x="34" y="24" fill="#d8e3e5">Android</text>
+    <g transform="translate(106)">
+      <rect width="70" height="38" fill="#0a1115" stroke="#34464d" />
+      <circle cx="20" cy="19" r="4" fill="#b8ff3d" />
+      <text x="34" y="24" fill="#d8e3e5">iOS</text>
+    </g>
+    <g transform="translate(188)">
+      <rect width="76" height="38" fill="#0a1115" stroke="#34464d" />
+      <circle cx="20" cy="19" r="4" fill="#39e6ff" />
+      <text x="34" y="24" fill="#d8e3e5">Web</text>
+    </g>
+    <g transform="translate(276)">
+      <rect width="174" height="38" fill="#0a1115" stroke="#34464d" />
+      <circle cx="20" cy="19" r="4" fill="#f6bf6f" />
+      <text x="34" y="24" fill="#d8e3e5">New Architecture</text>
+    </g>
+  </g>
+</svg>

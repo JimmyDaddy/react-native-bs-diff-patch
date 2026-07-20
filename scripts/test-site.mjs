@@ -13,9 +13,16 @@ const requiredFiles = [
   '404.html',
   'CNAME',
   '.nojekyll',
+  'favicon.svg',
+  'favicon-32.png',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'site.webmanifest',
   'assets/site.css',
   'assets/site.js',
   'assets/playground.js',
+  'assets/social-preview.png',
   'web/index.mjs',
   'web/worker.mjs',
   'web/operations.mjs',
@@ -153,6 +160,16 @@ const homepage = await readFile(
   path.join(outputDirectory, 'index.html'),
   'utf8'
 );
+assert.match(
+  homepage,
+  /<meta name="twitter:card" content="summary_large_image"/
+);
+assert.match(
+  homepage,
+  /<meta\s+property="og:image"\s+content="https:\/\/bs-dff-patch\.corerobin\.com\/assets\/social-preview\.png"/
+);
+assert.match(homepage, /<link rel="icon" href="\/favicon\.svg"/);
+assert.match(homepage, /<link rel="manifest" href="\/site\.webmanifest"/);
 assert.match(homepage, /id="playground"/);
 assert.match(homepage, /id="generate-patch"/);
 assert.match(homepage, /id="cancel-operation"/);
@@ -163,9 +180,46 @@ assert.match(homepage, /EINPUT_TOO_LARGE/);
 assert.match(homepage, /id="evidence"/);
 assert.match(homepage, /RN 0\.73\.11/);
 assert.match(homepage, /RN 0\.86\.0/);
-assert.match(homepage, /122 KiB packed/);
-assert.match(homepage, /452 KiB unpacked · 58 files/);
+assert.match(homepage, /125 KiB packed/);
+assert.match(homepage, /459 KiB unpacked · 58 files/);
 assert.match(homepage, /30,697\.5 ms/);
 assert.match(homepage, /assets\/playground\.js/);
+
+function pngDimensions(buffer) {
+  assert.equal(buffer.toString('ascii', 1, 4), 'PNG');
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
+
+assert.deepEqual(
+  pngDimensions(
+    await readFile(path.join(outputDirectory, 'assets/social-preview.png'))
+  ),
+  { width: 1280, height: 640 }
+);
+assert.deepEqual(
+  pngDimensions(await readFile(path.join(outputDirectory, 'favicon-32.png'))),
+  { width: 32, height: 32 }
+);
+assert.deepEqual(
+  pngDimensions(
+    await readFile(path.join(outputDirectory, 'apple-touch-icon.png'))
+  ),
+  { width: 180, height: 180 }
+);
+
+const manifest = JSON.parse(
+  await readFile(path.join(outputDirectory, 'site.webmanifest'), 'utf8')
+);
+assert.equal(manifest.theme_color, '#060a0d');
+assert.deepEqual(
+  manifest.icons.map(({ src, sizes }) => ({ src, sizes })),
+  [
+    { src: '/icon-192.png', sizes: '192x192' },
+    { src: '/icon-512.png', sizes: '512x512' },
+  ]
+);
 
 console.log('Site structure and local links passed');
