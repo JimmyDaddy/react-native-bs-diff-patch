@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runOperation } from '../web/operations.mjs';
+import { inspectPatch } from '../web/index.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const fixture = JSON.parse(
@@ -33,6 +34,24 @@ assert.deepEqual(
   newData,
   'patch should reconstruct the new bytes'
 );
+const metadata = await inspectPatch(patchData);
+assert.deepEqual(metadata, {
+  declaredTargetBytes: String(newData.byteLength),
+  format: 'ENDSLEY/BSDIFF43',
+  headerBytes: 24,
+  patchBytes: patchData.byteLength,
+  payloadBytes: patchData.byteLength - 24,
+  valid: true,
+});
+assert.deepEqual(await inspectPatch(new Uint8Array([1, 2, 3])), {
+  declaredTargetBytes: null,
+  format: 'UNKNOWN',
+  headerBytes: 3,
+  issue: 'TRUNCATED_HEADER',
+  patchBytes: 3,
+  payloadBytes: 0,
+  valid: false,
+});
 
 const goldenOldData = new Uint8Array(Buffer.from(fixture.oldBase64, 'base64'));
 const goldenNewData = new Uint8Array(Buffer.from(fixture.newBase64, 'base64'));

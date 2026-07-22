@@ -2,16 +2,18 @@
 
 ## Capability matrix
 
-| Capability                     | Android            | iOS                   | React Native Web   |
-| ------------------------------ | ------------------ | --------------------- | ------------------ |
-| File-path APIs                 | Yes                | Yes                   | No                 |
-| Binary-data APIs               | No                 | No                    | Yes                |
-| Progress / cooperative cancel  | Native jobs        | Native jobs           | `AbortSignal`      |
-| Input / output limits          | Native jobs        | Native jobs           | Binary options     |
-| Legacy bridge                  | Yes                | Yes                   | N/A                |
-| TurboModule / New Architecture | Yes                | Yes                   | N/A                |
-| Background execution           | Serial executor    | Serialized worker     | Module Web Worker  |
-| Patch format                   | `ENDSLEY/BSDIFF43` | `ENDSLEY/BSDIFF43`    | `ENDSLEY/BSDIFF43` |
+| Capability                     | Android            | iOS                | React Native Web   |
+| ------------------------------ | ------------------ | ------------------ | ------------------ |
+| File-path APIs                 | Yes                | Yes                | No                 |
+| Binary-data APIs               | No                 | No                 | Yes                |
+| Progress / cooperative cancel  | Native jobs        | Native jobs        | `AbortSignal`      |
+| Input / output limits          | Native jobs        | Native jobs        | Binary options     |
+| Patch metadata                 | File path          | File path          | Binary input       |
+| Byte-for-byte verification     | Temporary file     | Temporary file     | In-memory result   |
+| Legacy bridge                  | Yes                | Yes                | N/A                |
+| TurboModule / New Architecture | Yes                | Yes                | N/A                |
+| Background execution           | Serial executor    | Serialized worker  | Module Web Worker  |
+| Patch format                   | `ENDSLEY/BSDIFF43` | `ENDSLEY/BSDIFF43` | `ENDSLEY/BSDIFF43` |
 
 The example application uses React Native 0.86.0 and exercises the New
 Architecture on Android API 24/31 and iOS Simulator. Direct compatibility
@@ -33,6 +35,9 @@ Native minor version:
 Native operations run on a module-owned single-thread executor. Jobs add a
 registry for queued/active cancellation, rate-limited progress events, limits,
 and cleanup. The packaged C code is built with CMake and invoked through JNI.
+`inspectPatch` reads only the patch header. `verifyPatch` applies into a cache
+file, compares it with the expected path in bounded chunks, and removes the
+temporary output before resolving.
 
 ## iOS
 
@@ -45,6 +50,8 @@ following cancellation request is handled. Patch work runs asynchronously on a
 separate serial worker queue, keeping the bridge responsive while preserving the
 shared C library's single-operation boundary. The job registry is cancelled and
 cleaned when the module is invalidated.
+Metadata inspection reads only 24 header bytes. Verification writes to a unique
+file under the system temporary directory and removes it on every exit path.
 
 ## React Native Web
 
@@ -75,6 +82,9 @@ Calls without an `AbortSignal` share a module Worker and initialized
 WebAssembly module. Calls with a signal receive a dedicated Worker so
 cancellation is isolated to that operation. Both paths serialize work inside
 their Worker; callers should still enforce an application memory budget.
+`inspectPatch` does not start a Worker. `verifyPatch` first validates metadata,
+then uses the same Worker path as `patchBytes` and discards the restored buffer
+after comparing it with the expected input.
 
 ## Server-side rendering
 

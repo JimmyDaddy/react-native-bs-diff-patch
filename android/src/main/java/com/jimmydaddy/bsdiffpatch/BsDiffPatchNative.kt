@@ -1,7 +1,9 @@
 package com.jimmydaddy.bsdiffpatch
 
 import java.io.File
+import java.io.FileInputStream
 import java.io.RandomAccessFile
+import org.json.JSONObject
 import kotlin.math.floor
 
 internal object BsDiffPatchNative {
@@ -32,6 +34,76 @@ internal object BsDiffPatchNative {
       "diff",
       bsDiffFile(paths.old.absolutePath, paths.input.absolutePath, paths.output.absolutePath)
     )
+  }
+
+  fun inspectPatch(patchFile: String, maxInputBytes: Double): String {
+    val inputLimit = validateLimit(maxInputBytes, "maxInputBytes")
+    val patch = File(normalizePath(patchFile))
+    validateNonEmpty(patchFile, "patchFile")
+    requireInput(patch, "patchFile", patchFile)
+    enforceInputLimit(inputLimit, patch)
+    return inspectPatchFile(patch).toJson().toString()
+  }
+
+  fun verifyPatch(
+    oldFile: String,
+    patchFile: String,
+    expectedFile: String,
+    outputFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double
+  ): String {
+    validateNonEmpty(oldFile, "oldFile")
+    validateNonEmpty(patchFile, "patchFile")
+    validateNonEmpty(expectedFile, "expectedFile")
+    validateNonEmpty(outputFile, "outputFile")
+    val normalized = listOf(oldFile, patchFile, expectedFile, outputFile).map(::normalizePath)
+    if (normalized.toSet().size != normalized.size) {
+      throw BsDiffPatchException(
+        "EINVAL",
+        "oldFile, patchFile, expectedFile, and internal output can not be the same"
+      )
+    }
+
+    val old = File(normalized[0])
+    val patch = File(normalized[1])
+    val expected = File(normalized[2])
+    val output = File(normalized[3])
+    requireInput(old, "oldFile", oldFile)
+    requireInput(patch, "patchFile", patchFile)
+    requireInput(expected, "expectedFile", expectedFile)
+    requireOutput(output, "outputFile", outputFile)
+
+    val inputLimit = validateLimit(maxInputBytes, "maxInputBytes")
+    val outputLimit = validateLimit(maxOutputBytes, "maxOutputBytes")
+    enforceInputLimit(inputLimit, old, patch, expected)
+    enforcePatchOutputLimit(outputLimit, patch)
+    val metadata = inspectPatchFile(patch)
+    if (!metadata.valid) {
+      throw BsDiffPatchException(
+        "EPATCH",
+        "patch structure is invalid: ${metadata.issue ?: "UNKNOWN"}"
+      )
+    }
+
+    requireSuccess(
+      "EPATCH",
+      "patch verification",
+      bsPatchFile(old.absolutePath, output.absolutePath, patch.absolutePath)
+    )
+    if (outputLimit > 0 && output.length() > outputLimit) {
+      throw BsDiffPatchException(
+        "EOUTPUT_TOO_LARGE",
+        "output is ${output.length()} bytes and exceeds the configured $outputLimit byte limit"
+      )
+    }
+    val verified = filesEqual(output, expected)
+    return JSONObject()
+      .put("verified", verified)
+      .put("restoredBytes", output.length())
+      .put("expectedBytes", expected.length())
+      .put("patch", metadata.toJson())
+      .toString()
   }
 
   fun patchJob(
@@ -189,6 +261,83 @@ internal object BsDiffPatchNative {
     }
   }
 
+  private fun inspectPatchFile(patchFile: File): PatchMetadataValue {
+    val patchBytes = patchFile.length()
+    val headerBytes = minOf(patchBytes, 24L).toInt()
+    val header = ByteArray(headerBytes)
+    FileInputStream(patchFile).use { input ->
+      var offset = 0
+      while (offset < header.size) {
+        val count = input.read(header, offset, header.size - offset)
+        if (count < 0) break
+        offset += count
+      }
+    }
+    val legacyMagic = header.copyOfRange(0, minOf(8, header.size)).toString(Charsets.US_ASCII)
+    val currentMagic = header.copyOfRange(0, minOf(16, header.size)).toString(Charsets.US_ASCII)
+    if (header.size < 24) {
+      return PatchMetadataValue(
+        format = if (legacyMagic == "BSDIFF40") "BSDIFF40" else "UNKNOWN",
+        patchBytes = patchBytes,
+        headerBytes = header.size,
+        declaredTargetBytes = null,
+        valid = false,
+        issue = if (legacyMagic == "BSDIFF40") "LEGACY_FORMAT" else "TRUNCATED_HEADER"
+      )
+    }
+    if (currentMagic != "ENDSLEY/BSDIFF43") {
+      return PatchMetadataValue(
+        format = if (legacyMagic == "BSDIFF40") "BSDIFF40" else "UNKNOWN",
+        patchBytes = patchBytes,
+        headerBytes = 24,
+        declaredTargetBytes = null,
+        valid = false,
+        issue = if (legacyMagic == "BSDIFF40") "LEGACY_FORMAT" else "INVALID_MAGIC"
+      )
+    }
+    if (header[23].toInt() and 0x80 != 0) {
+      return PatchMetadataValue(
+        format = "ENDSLEY/BSDIFF43",
+        patchBytes = patchBytes,
+        headerBytes = 24,
+        declaredTargetBytes = null,
+        valid = false,
+        issue = "INVALID_TARGET_SIZE"
+      )
+    }
+    var targetBytes = 0L
+    for (index in 23 downTo 16) {
+      targetBytes = targetBytes * 256 + (header[index].toInt() and 0xff)
+    }
+    return PatchMetadataValue(
+      format = "ENDSLEY/BSDIFF43",
+      patchBytes = patchBytes,
+      headerBytes = 24,
+      declaredTargetBytes = targetBytes.toString(),
+      valid = true,
+      issue = null
+    )
+  }
+
+  private fun filesEqual(first: File, second: File): Boolean {
+    if (first.length() != second.length()) return false
+    FileInputStream(first).buffered().use { firstInput ->
+      FileInputStream(second).buffered().use { secondInput ->
+        val firstBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        val secondBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+          val firstCount = firstInput.read(firstBuffer)
+          val secondCount = secondInput.read(secondBuffer)
+          if (firstCount != secondCount) return false
+          if (firstCount < 0) return true
+          for (index in 0 until firstCount) {
+            if (firstBuffer[index] != secondBuffer[index]) return false
+          }
+        }
+      }
+    }
+  }
+
   private fun requireInput(file: File, fieldName: String, originalPath: String) {
     if (!file.exists()) {
       throw BsDiffPatchException("ENOENT", "$fieldName: $originalPath does not exist")
@@ -273,6 +422,26 @@ internal object BsDiffPatchNative {
   private external fun bsCancelOperation(jobId: String): Boolean
 
   private data class Paths(val old: File, val input: File, val output: File)
+
+  private data class PatchMetadataValue(
+    val format: String,
+    val patchBytes: Long,
+    val headerBytes: Int,
+    val declaredTargetBytes: String?,
+    val valid: Boolean,
+    val issue: String?
+  ) {
+    fun toJson(): JSONObject = JSONObject()
+      .put("format", format)
+      .put("patchBytes", patchBytes)
+      .put("headerBytes", headerBytes)
+      .put("payloadBytes", (patchBytes - 24L).coerceAtLeast(0L))
+      .put("declaredTargetBytes", declaredTargetBytes ?: JSONObject.NULL)
+      .put("valid", valid)
+      .apply {
+        if (issue != null) put("issue", issue)
+      }
+  }
 }
 
 internal class BsDiffPatchException(

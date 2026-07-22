@@ -11,8 +11,12 @@ import {
   startPatch,
   diffBytes,
   patchBytes,
+  inspectPatch,
+  verifyPatch,
   type BinaryInput,
   type BinaryOperationOptions,
+  type PatchMetadata,
+  type PatchVerificationResult,
 } from 'react-native-bs-diff-patch';
 ```
 
@@ -147,6 +151,85 @@ bytes. Available on Web.
 - Rejects before allocating the declared output when the patch header exceeds
   `maxOutputBytes`.
 
+## `inspectPatch`
+
+```ts
+interface PatchInspectionOptions {
+  maxInputBytes?: number;
+}
+
+interface PatchMetadata {
+  format: 'ENDSLEY/BSDIFF43' | 'BSDIFF40' | 'UNKNOWN';
+  patchBytes: number;
+  headerBytes: number;
+  payloadBytes: number;
+  declaredTargetBytes: string | null;
+  valid: boolean;
+  issue?:
+    | 'TRUNCATED_HEADER'
+    | 'LEGACY_FORMAT'
+    | 'INVALID_MAGIC'
+    | 'INVALID_TARGET_SIZE';
+}
+
+function inspectPatch(
+  patchInput: string | BinaryInput,
+  options?: PatchInspectionOptions
+): Promise<PatchMetadata>;
+```
+
+Reads the 24-byte patch header without applying the patch. Pass a native patch
+path on Android/iOS or a `BinaryInput` on Web.
+
+- `declaredTargetBytes` is a decimal string so values above
+  `Number.MAX_SAFE_INTEGER` remain exact.
+- `valid` only establishes structural compatibility. It does not authenticate
+  the patch or prove that its compressed payload is intact.
+- `BSDIFF40` is reported as `LEGACY_FORMAT`, not accepted as
+  `ENDSLEY/BSDIFF43`.
+- `maxInputBytes` bounds the patch file or binary input before its header is
+  inspected.
+
+## `verifyPatch`
+
+```ts
+interface PatchVerificationResult {
+  verified: boolean;
+  restoredBytes: number;
+  expectedBytes: number;
+  patch: PatchMetadata;
+}
+
+// Android / iOS paths
+function verifyPatch(
+  oldFile: string,
+  patchFile: string,
+  expectedFile: string,
+  options?: NativeOperationOptions
+): Promise<PatchVerificationResult>;
+
+// Web binary values
+function verifyPatch(
+  oldData: BinaryInput,
+  patchData: BinaryInput,
+  expectedData: BinaryInput,
+  options?: BinaryOperationOptions
+): Promise<PatchVerificationResult>;
+```
+
+Applies the patch and compares the restored result with the expected target
+byte-for-byte.
+
+- A valid match resolves with `verified: true`; a well-formed patch that
+  restores different bytes resolves with `verified: false`.
+- Malformed or incompatible structure rejects with `EPATCH`.
+- Native implementations use a library-owned temporary output and remove it on
+  success, mismatch, or failure. The method never replaces application data.
+- Web verification uses the same Worker/Wasm path as `patchBytes` and honors
+  `AbortSignal` and byte limits.
+- Resource-limit failures from these portable APIs use `ERESOURCE` on every
+  platform.
+
 ## Web operation options
 
 - `signal` cancels the current Web operation. A call with a signal receives a
@@ -165,7 +248,8 @@ path operations use `startDiff` or `startPatch` for equivalent controls.
 All functions remain exported so shared code has one stable import shape.
 Calling `diffBytes` or `patchBytes` on native rejects with `EUNSUPPORTED`.
 Calling `diff`, `patch`, `startDiff`, or `startPatch` on Web behaves the same
-way.
+way. `inspectPatch` and `verifyPatch` are available on every platform, but they
+require native paths on Android/iOS and binary values on Web.
 
 Importing the Web entry during server-side rendering does not start a Worker.
 Calling a binary API without browser Worker support rejects with
@@ -180,22 +264,22 @@ platform can classify the failure.
 type PatchError = Error & { code?: string };
 ```
 
-| Code           | Meaning                                                     |
-| -------------- | ----------------------------------------------------------- |
-| `EINVAL`       | Empty, duplicate, or invalid input.                         |
-| `ENOENT`       | A required native file does not exist.                      |
-| `EEXIST`       | A native output path already exists.                        |
-| `EUNSUPPORTED` | The selected API is not available on the current platform.  |
-| `EUNAVAILABLE` | The native module worker has already shut down.             |
-| `ECANCELLED`   | A native job was cooperatively cancelled.                   |
-| `EINPUT_TOO_LARGE` | A native input exceeded `maxInputBytes`.               |
-| `EOUTPUT_TOO_LARGE` | Native generated/restored output exceeded its limit.  |
-| `EABORTED`     | The Web operation was cancelled through its signal.         |
-| `ERESOURCE`    | A configured Web input or output byte limit was exceeded.   |
-| `EDIFF`        | The native diff core rejected or could not write the input. |
-| `EPATCH`       | The native patch core rejected a malformed patch or output. |
-| `EWEBASSEMBLY` | WebAssembly loading, patch validation, or execution failed. |
-| `EUNSPECIFIED` | An unclassified native exception occurred.                  |
+| Code                | Meaning                                                     |
+| ------------------- | ----------------------------------------------------------- |
+| `EINVAL`            | Empty, duplicate, or invalid input.                         |
+| `ENOENT`            | A required native file does not exist.                      |
+| `EEXIST`            | A native output path already exists.                        |
+| `EUNSUPPORTED`      | The selected API is not available on the current platform.  |
+| `EUNAVAILABLE`      | The native module worker has already shut down.             |
+| `ECANCELLED`        | A native job was cooperatively cancelled.                   |
+| `EINPUT_TOO_LARGE`  | A native input exceeded `maxInputBytes`.                    |
+| `EOUTPUT_TOO_LARGE` | Native generated/restored output exceeded its limit.        |
+| `EABORTED`          | The Web operation was cancelled through its signal.         |
+| `ERESOURCE`         | A portable or Web input/output byte limit was exceeded.     |
+| `EDIFF`             | The native diff core rejected or could not write the input. |
+| `EPATCH`            | The native patch core rejected a malformed patch or output. |
+| `EWEBASSEMBLY`      | WebAssembly loading, patch validation, or execution failed. |
+| `EUNSPECIFIED`      | An unclassified native exception occurred.                  |
 
 Treat error messages as diagnostic text rather than a stable machine-readable
 contract. Branch on `code` when recovery behavior differs.

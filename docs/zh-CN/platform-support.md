@@ -2,16 +2,18 @@
 
 ## 能力矩阵
 
-| 能力                 | Android            | iOS      | React Native Web |
-| -------------------- | ------------------ | -------- | ---------------- |
-| 文件路径 API         | 支持               | 支持     | 不支持           |
-| 二进制数据 API       | 不支持             | 不支持   | 支持             |
-| 进度 / 协作式取消   | 原生 job           | 原生 job | `AbortSignal`    |
-| 输入 / 输出限制     | 原生 job           | 原生 job | 二进制 options   |
-| 旧桥接架构           | 支持               | 支持     | 不适用           |
-| TurboModule / 新架构 | 支持               | 支持     | 不适用           |
+| 能力                 | Android            | iOS         | React Native Web |
+| -------------------- | ------------------ | ----------- | ---------------- |
+| 文件路径 API         | 支持               | 支持        | 不支持           |
+| 二进制数据 API       | 不支持             | 不支持      | 支持             |
+| 进度 / 协作式取消    | 原生 job           | 原生 job    | `AbortSignal`    |
+| 输入 / 输出限制      | 原生 job           | 原生 job    | 二进制 options   |
+| 补丁元数据           | 文件路径           | 文件路径    | 二进制输入       |
+| 逐字节验证           | 临时文件           | 临时文件    | 内存结果         |
+| 旧桥接架构           | 支持               | 支持        | 不适用           |
+| TurboModule / 新架构 | 支持               | 支持        | 不适用           |
 | 后台执行             | 串行 executor      | 串行 worker | 模块 Web Worker  |
-| 补丁格式             | `ENDSLEY/BSDIFF43` | 同左     | 同左             |
+| 补丁格式             | `ENDSLEY/BSDIFF43` | 同左        | 同左             |
 
 示例应用使用 React Native 0.86.0，并在 Android API 24/31 与 iOS Simulator
 验证新架构运行时。直接兼容 fixture 会针对 React Native 0.73.11、0.74.7 编译
@@ -29,6 +31,8 @@ Android 根据 React Native 次版本选择新架构包实现：
 
 原生操作运行在模块自有的单线程 executor 上。job registry 负责排队/运行中取消、
 限频进度、资源限制和清理。项目内置 C 代码通过 CMake 构建，并由 JNI 调用。
+`inspectPatch` 只读取补丁头；`verifyPatch` 将结果写入缓存临时文件，分块比较预期
+路径，并在返回前删除临时输出。
 
 ## iOS
 
@@ -39,6 +43,8 @@ TurboModule 实例。
 模块方法使用串行 dispatch queue，确保后续取消请求到达时 job 已经登记。耗时补丁
 操作会异步进入独立的串行工作队列，在保持桥接响应的同时维护共享 C 核心的单操作
 边界。模块失效时会取消并清理 job registry。
+元数据检查只读取 24 字节补丁头。验证使用系统临时目录中的唯一文件，并在所有退出
+路径上清理。
 
 ## React Native Web
 
@@ -67,6 +73,8 @@ Web 入口面向浏览器，不是 Node.js 文件系统适配器；它不会在 
 未传 `AbortSignal` 的调用共用模块 Worker 与已初始化的 WebAssembly 模块；带
 signal 的调用使用专用 Worker，保证取消只影响当前任务。两种路径都会在各自 Worker
 内串行执行，但调用方仍应设置应用级内存预算。
+`inspectPatch` 不会启动 Worker。`verifyPatch` 先验证元数据，再复用 `patchBytes`
+的 Worker 路径，并在与预期输入比较后丢弃还原缓冲区。
 
 ## 服务端渲染
 

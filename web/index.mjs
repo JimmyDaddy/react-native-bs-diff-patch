@@ -4,6 +4,9 @@ function createError(code, message) {
   return error;
 }
 
+const PATCH_MAGIC = 'ENDSLEY/BSDIFF43';
+const PATCH_HEADER_BYTES = 24;
+
 function validateLimit(value, fieldName) {
   if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
     throw createError(
@@ -32,18 +35,71 @@ function enforceLimit(actualBytes, maximumBytes, fieldName) {
   }
 }
 
-function patchOutputSize(patchData) {
-  if (patchData.byteLength < 24) {
-    return undefined;
+function decodePatchMetadata(patchData) {
+  const headerBytes = Math.min(patchData.byteLength, PATCH_HEADER_BYTES);
+  const legacyMagic = String.fromCharCode(
+    ...patchData.slice(0, Math.min(8, patchData.byteLength))
+  );
+  const currentMagic = String.fromCharCode(
+    ...patchData.slice(0, Math.min(16, patchData.byteLength))
+  );
+  const common = {
+    patchBytes: patchData.byteLength,
+    headerBytes,
+    payloadBytes: Math.max(0, patchData.byteLength - PATCH_HEADER_BYTES),
+  };
+
+  if (patchData.byteLength < PATCH_HEADER_BYTES) {
+    return {
+      metadata: {
+        ...common,
+        declaredTargetBytes: null,
+        format: legacyMagic === 'BSDIFF40' ? 'BSDIFF40' : 'UNKNOWN',
+        issue:
+          legacyMagic === 'BSDIFF40' ? 'LEGACY_FORMAT' : 'TRUNCATED_HEADER',
+        valid: false,
+      },
+      targetBytes: undefined,
+    };
   }
-  let outputSize = 0n;
+  if (currentMagic !== PATCH_MAGIC) {
+    return {
+      metadata: {
+        ...common,
+        declaredTargetBytes: null,
+        format: legacyMagic === 'BSDIFF40' ? 'BSDIFF40' : 'UNKNOWN',
+        issue: legacyMagic === 'BSDIFF40' ? 'LEGACY_FORMAT' : 'INVALID_MAGIC',
+        valid: false,
+      },
+      targetBytes: undefined,
+    };
+  }
+  if ((patchData[23] & 0x80) !== 0) {
+    return {
+      metadata: {
+        ...common,
+        declaredTargetBytes: null,
+        format: PATCH_MAGIC,
+        issue: 'INVALID_TARGET_SIZE',
+        valid: false,
+      },
+      targetBytes: undefined,
+    };
+  }
+
+  let targetBytes = 0n;
   for (let index = 23; index >= 16; index -= 1) {
-    if (index === 23 && (patchData[index] & 0x80) !== 0) {
-      return undefined;
-    }
-    outputSize = outputSize * 256n + BigInt(patchData[index]);
+    targetBytes = targetBytes * 256n + BigInt(patchData[index]);
   }
-  return outputSize;
+  return {
+    metadata: {
+      ...common,
+      declaredTargetBytes: targetBytes.toString(),
+      format: PATCH_MAGIC,
+      valid: true,
+    },
+    targetBytes,
+  };
 }
 
 async function toUint8Array(input, fieldName) {
@@ -278,7 +334,8 @@ async function runWorker(operation, oldInput, input, options = {}) {
   ]);
 
   if (operation === 'patch' && options.maxOutputBytes !== undefined) {
-    const declaredOutputSize = patchOutputSize(inputFileData);
+    const { targetBytes: declaredOutputSize } =
+      decodePatchMetadata(inputFileData);
     if (
       declaredOutputSize !== undefined &&
       declaredOutputSize > BigInt(options.maxOutputBytes)
@@ -318,6 +375,62 @@ export function diffBytes(oldData, newData, options) {
 
 export function patchBytes(oldData, patchData, options) {
   return runWorker('patch', oldData, patchData, options);
+}
+
+export async function inspectPatch(patchData, options = {}) {
+  validateLimit(options.maxInputBytes, 'maxInputBytes');
+  const observedBytes = inputByteLength(patchData);
+  if (observedBytes !== undefined) {
+    enforceLimit(observedBytes, options.maxInputBytes, 'patchData');
+  }
+  const bytes = await toUint8Array(patchData, 'patchData');
+  enforceLimit(bytes.byteLength, options.maxInputBytes, 'patchData');
+  return decodePatchMetadata(bytes).metadata;
+}
+
+export async function verifyPatch(
+  oldData,
+  patchData,
+  expectedData,
+  options = {}
+) {
+  validateLimit(options.maxInputBytes, 'maxInputBytes');
+  validateLimit(options.maxOutputBytes, 'maxOutputBytes');
+  if (options.signal?.aborted) {
+    throw createError('EABORTED', 'verify was aborted');
+  }
+  const expectedByteLength = inputByteLength(expectedData);
+  if (expectedByteLength !== undefined) {
+    enforceLimit(expectedByteLength, options.maxInputBytes, 'expectedData');
+  }
+  const metadata = await inspectPatch(patchData, {
+    maxInputBytes: options.maxInputBytes,
+  });
+  if (!metadata.valid) {
+    throw createError(
+      'EPATCH',
+      `patch structure is invalid: ${metadata.issue || 'UNKNOWN'}`
+    );
+  }
+  const [expectedBytes, restoredBytes] = await Promise.all([
+    toUint8Array(expectedData, 'expectedData'),
+    patchBytes(oldData, patchData, options),
+  ]);
+  enforceLimit(expectedBytes.byteLength, options.maxInputBytes, 'expectedData');
+  let verified = restoredBytes.byteLength === expectedBytes.byteLength;
+  for (
+    let index = 0;
+    verified && index < restoredBytes.byteLength;
+    index += 1
+  ) {
+    verified = restoredBytes[index] === expectedBytes[index];
+  }
+  return {
+    expectedBytes: expectedBytes.byteLength,
+    patch: metadata,
+    restoredBytes: restoredBytes.byteLength,
+    verified,
+  };
 }
 
 let unsupportedNativeJobId = 0;

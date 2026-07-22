@@ -25,6 +25,35 @@ export interface NativeOperationJob {
   onProgress(listener: (event: NativeOperationProgress) => void): () => void;
 }
 
+export type PatchFormat = 'ENDSLEY/BSDIFF43' | 'BSDIFF40' | 'UNKNOWN';
+
+export type PatchStructuralIssue =
+  | 'TRUNCATED_HEADER'
+  | 'LEGACY_FORMAT'
+  | 'INVALID_MAGIC'
+  | 'INVALID_TARGET_SIZE';
+
+export interface PatchInspectionOptions {
+  maxInputBytes?: number;
+}
+
+export interface PatchMetadata {
+  format: PatchFormat;
+  patchBytes: number;
+  headerBytes: number;
+  payloadBytes: number;
+  declaredTargetBytes: string | null;
+  valid: boolean;
+  issue?: PatchStructuralIssue;
+}
+
+export interface PatchVerificationResult {
+  verified: boolean;
+  restoredBytes: number;
+  expectedBytes: number;
+  patch: PatchMetadata;
+}
+
 export function diff(
   oldFile: string,
   newFile: string,
@@ -48,6 +77,18 @@ export function patchBytes(
   patchData: BinaryInput,
   options?: BinaryOperationOptions
 ): Promise<Uint8Array>;
+
+export function inspectPatch(
+  patchData: BinaryInput,
+  options?: PatchInspectionOptions
+): Promise<PatchMetadata>;
+
+export function verifyPatch(
+  oldData: BinaryInput,
+  patchData: BinaryInput,
+  expectedData: BinaryInput,
+  options?: BinaryOperationOptions
+): Promise<PatchVerificationResult>;
 
 export function startDiff(
   oldFile: string,

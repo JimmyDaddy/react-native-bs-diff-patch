@@ -34,6 +34,37 @@ export interface NativeOperationJob {
   onProgress(listener: (event: NativeOperationProgress) => void): () => void;
 }
 
+export type PatchFormat = 'ENDSLEY/BSDIFF43' | 'BSDIFF40' | 'UNKNOWN';
+
+export type PatchStructuralIssue =
+  | 'TRUNCATED_HEADER'
+  | 'LEGACY_FORMAT'
+  | 'INVALID_MAGIC'
+  | 'INVALID_TARGET_SIZE';
+
+export interface PatchInspectionOptions {
+  /** Reject when the patch input exceeds this number of bytes. */
+  maxInputBytes?: number;
+}
+
+export interface PatchMetadata {
+  format: PatchFormat;
+  patchBytes: number;
+  headerBytes: number;
+  payloadBytes: number;
+  /** Decimal string so target sizes above Number.MAX_SAFE_INTEGER stay exact. */
+  declaredTargetBytes: string | null;
+  valid: boolean;
+  issue?: PatchStructuralIssue;
+}
+
+export interface PatchVerificationResult {
+  verified: boolean;
+  restoredBytes: number;
+  expectedBytes: number;
+  patch: PatchMetadata;
+}
+
 type NativeProgressEvent = Omit<NativeOperationProgress, 'operation'>;
 
 const NATIVE_PROGRESS_EVENT = 'BsDiffPatchProgress';
@@ -154,6 +185,99 @@ export function startDiff(
   options?: NativeOperationOptions
 ): NativeOperationJob {
   return createNativeJob('diff', oldFile, newFile, patchFile, options);
+}
+
+function parseNativeJsonResult<T>(methodName: string, value: string): T {
+  try {
+    const parsed = JSON.parse(value) as T;
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('result is not an object');
+    }
+    return parsed;
+  } catch (cause) {
+    const error = new Error(
+      `${methodName} returned invalid native metadata`
+    ) as Error & { code: string; cause?: unknown };
+    error.code = 'EUNSPECIFIED';
+    error.cause = cause;
+    throw error;
+  }
+}
+
+function rethrowPortablePatchError(error: unknown): never {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error.code === 'EINPUT_TOO_LARGE' || error.code === 'EOUTPUT_TOO_LARGE')
+  ) {
+    (error as { code: string }).code = 'ERESOURCE';
+  }
+  throw error;
+}
+
+/**
+ * Inspect an ENDSLEY/BSDIFF43 patch without applying it.
+ * Native platforms accept a file path; Web accepts BinaryInput.
+ */
+export async function inspectPatch(
+  patchInput: string | BinaryInput,
+  options: PatchInspectionOptions = {}
+): Promise<PatchMetadata> {
+  if (typeof patchInput !== 'string') {
+    return rejectNativeBinaryInput('inspectPatch');
+  }
+  try {
+    const result = await BsDiffPatch.inspectPatch(
+      patchInput,
+      validateNativeLimit(options.maxInputBytes, 'maxInputBytes')
+    );
+    return parseNativeJsonResult<PatchMetadata>('inspectPatch', result);
+  } catch (error) {
+    return rethrowPortablePatchError(error);
+  }
+}
+
+/**
+ * Apply a patch to a temporary native file and compare it byte-for-byte with
+ * the expected file. Web accepts the equivalent three BinaryInput values.
+ */
+export async function verifyPatch(
+  oldInput: string | BinaryInput,
+  patchInput: string | BinaryInput,
+  expectedInput: string | BinaryInput,
+  options: NativeOperationOptions | BinaryOperationOptions = {}
+): Promise<PatchVerificationResult> {
+  if (
+    typeof oldInput !== 'string' ||
+    typeof patchInput !== 'string' ||
+    typeof expectedInput !== 'string'
+  ) {
+    return rejectNativeBinaryInput('verifyPatch');
+  }
+  try {
+    const result = await BsDiffPatch.verifyPatch(
+      oldInput,
+      patchInput,
+      expectedInput,
+      validateNativeLimit(options.maxInputBytes, 'maxInputBytes'),
+      validateNativeLimit(options.maxOutputBytes, 'maxOutputBytes')
+    );
+    return parseNativeJsonResult<PatchVerificationResult>(
+      'verifyPatch',
+      result
+    );
+  } catch (error) {
+    return rethrowPortablePatchError(error);
+  }
+}
+
+function rejectNativeBinaryInput(methodName: string): Promise<never> {
+  const error = new Error(
+    `${methodName} accepts file paths on native platforms; BinaryInput is only available on Web`
+  ) as Error & { code: string };
+  error.code = 'EUNSUPPORTED';
+  return Promise.reject(error);
 }
 
 function rejectWebOnlyApi(methodName: string): Promise<never> {

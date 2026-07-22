@@ -14,7 +14,7 @@ internal class BsDiffPatchTaskRunner {
     Thread(runnable, "BsDiffPatchWorker")
   }
 
-  fun execute(promise: Promise, block: () -> Int) {
+  fun execute(promise: Promise, block: () -> Any?) {
     submit(promise) { block() }
   }
 
@@ -52,7 +52,7 @@ internal class BsDiffPatchTaskRunner {
     return activeJobIds
   }
 
-  private fun submit(promise: Promise, block: () -> Int): Boolean {
+  private fun submit(promise: Promise, block: () -> Any?): Boolean {
     try {
       executor.execute {
         try {

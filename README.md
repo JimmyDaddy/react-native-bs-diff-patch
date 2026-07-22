@@ -21,6 +21,7 @@
 <p align="center">
   <a href="https://bs-dff-patch.corerobin.com/docs/">Documentation</a> ·
   <a href="https://bs-dff-patch.corerobin.com/#playground">Live Playground</a> ·
+  <a href="https://bs-dff-patch.corerobin.com/tools/">Binary Patch Toolkit</a> ·
   <a href="./README.zh-CN.md">中文说明</a> ·
   <a href="https://www.npmjs.com/package/react-native-bs-diff-patch">npm</a>
 </p>
@@ -50,15 +51,18 @@ replaces live data.
   cap input/output sizes, and avoid exposing partial output files.
 - **No patch service required:** Web diffing and patching happen locally in the
   browser.
+- **Inspect and prove compatibility:** read patch metadata and verify restored
+  bytes through the same API shape on native and Web.
 
 ## Platform overview
 
-|                | Android / iOS                  | React Native Web                                   |
-| -------------- | ------------------------------ | -------------------------------------------------- |
-| Input          | Absolute file paths            | `ArrayBuffer`, typed arrays, `DataView`, or `Blob` |
-| Basic API      | `diff()` / `patch()`           | `diffBytes()` / `patchBytes()`                     |
-| Controlled API | `startDiff()` / `startPatch()` | `AbortSignal` and binary limits                    |
-| Engine         | Native C via JNI / ObjC++      | Same C core via WASM Worker                        |
+|                | Android / iOS                                | React Native Web                                   |
+| -------------- | -------------------------------------------- | -------------------------------------------------- |
+| Input          | Absolute file paths                          | `ArrayBuffer`, typed arrays, `DataView`, or `Blob` |
+| Basic API      | `diff()` / `patch()`                         | `diffBytes()` / `patchBytes()`                     |
+| Controlled API | `startDiff()` / `startPatch()`               | `AbortSignal` and binary limits                    |
+| Verification   | Paths via `inspectPatch()` / `verifyPatch()` | Binary values via the same APIs                    |
+| Engine         | Native C via JNI / ObjC++                    | Same C core via WASM Worker                        |
 
 ## Install
 
@@ -138,17 +142,44 @@ Web calls return a new `Uint8Array` and leave caller-owned buffers usable.
 Aborted operations reject with `EABORTED`; configured binary limits reject with
 `ERESOURCE`.
 
+## Inspect and verify a patch
+
+Use `inspectPatch()` for a cheap structural check, then `verifyPatch()` to apply
+into a temporary result and compare it with the expected target byte-for-byte:
+
+```ts
+import { inspectPatch, verifyPatch } from 'react-native-bs-diff-patch';
+
+// Android / iOS use paths. Web uses File, Blob, ArrayBuffer, or typed arrays.
+const metadata = await inspectPatch(patchPath);
+const result = await verifyPatch(oldPath, patchPath, expectedPath, {
+  maxInputBytes: 64 * 1024 * 1024,
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+
+if (!metadata.valid || !result.verified) {
+  throw new Error('Patch compatibility check failed');
+}
+```
+
+The native verification output is temporary and always cleaned up. The Web
+form accepts `oldFile`, `patchFile`, and `expectedFile` in the same argument
+order. Structural validity is diagnostic; authenticate trusted hashes in your
+update manifest before replacing live data.
+
 ## API matrix
 
-| API                                        | Android | iOS | Web |
-| ------------------------------------------ | ------- | --- | --- |
-| `diff(oldPath, newPath, patchPath)`        | Yes     | Yes | No  |
-| `patch(oldPath, outputPath, patchPath)`    | Yes     | Yes | No  |
-| `startDiff(...)` / `startPatch(...)`       | Yes     | Yes | No  |
-| `diffBytes(oldData, newData, options?)`    | No      | No  | Yes |
-| `patchBytes(oldData, patchData, options?)` | No      | No  | Yes |
-| Legacy architecture, while supplied by RN  | Yes     | Yes | N/A |
-| New Architecture / TurboModule             | Yes     | Yes | N/A |
+| API                                           | Android | iOS | Web |
+| --------------------------------------------- | ------- | --- | --- |
+| `diff(oldPath, newPath, patchPath)`           | Yes     | Yes | No  |
+| `patch(oldPath, outputPath, patchPath)`       | Yes     | Yes | No  |
+| `startDiff(...)` / `startPatch(...)`          | Yes     | Yes | No  |
+| `diffBytes(oldData, newData, options?)`       | No      | No  | Yes |
+| `patchBytes(oldData, patchData, options?)`    | No      | No  | Yes |
+| `inspectPatch(path or binary, options?)`      | Yes     | Yes | Yes |
+| `verifyPatch(old, patch, expected, options?)` | Yes     | Yes | Yes |
+| Legacy architecture, while supplied by RN     | Yes     | Yes | N/A |
+| New Architecture / TurboModule                | Yes     | Yes | N/A |
 
 Unavailable platform APIs reject with `EUNSUPPORTED`; the package never
 silently switches to a different input model.

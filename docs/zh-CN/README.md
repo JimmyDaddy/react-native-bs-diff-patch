@@ -25,5 +25,7 @@
 - [架构](/docs/zh-CN/architecture/) — 执行路径与补丁兼容性。
 - [可控制的原生操作](/docs/zh-CN/native-operations-v03/) — 资源限制、取消、进度与
   原子输出约定。
+- [大文件演进路线](/docs/zh-CN/large-files-v04/) — 下一阶段的内存基线、真实进度和
+  流式能力可行性。
 - [常见问题与排障](/docs/zh-CN/troubleshooting/) — 常见集成失败。
 - [开发与验证](/docs/zh-CN/development/) — 本地构建、测试、WASM 与发布检查。

@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-07-20T06:07:44.301Z",
+  "runtime": {
+    "cpu": "Apple M3 Pro",
+    "node": "v22.22.0",
+    "platform": "darwin-arm64"
+  },
+  "workload": {
+    "description": "Deterministic buffers with one changed byte per 4 KiB",
+    "memoryMetric": "Peak resident set size for one initialized WebAssembly diff and patch process",
+    "processIsolation": "Each input size runs in a fresh Node.js process"
+  },
+  "summary": {
+    "passed": 2,
+    "failed": 1
+  },
+  "results": [
+    {
+      "sizeMiB": 16,
+      "status": "passed",
+      "initializationMs": 15.6,
+      "diffMs": 8769.2,
+      "patchMs": 125.4,
+      "patchBytes": 113,
+      "peakRssMiB": 639.1,
+      "residentAfterMiB": 639.1,
+      "externalAfterMiB": 442.2,
+      "arrayBuffersAfterMiB": 129.1
+    },
+    {
+      "sizeMiB": 64,
+      "status": "passed",
+      "initializationMs": 13.2,
+      "diffMs": 49136.5,
+      "patchMs": 784.7,
+      "patchBytes": 189,
+      "peakRssMiB": 2094.3,
+      "residentAfterMiB": 2094.3,
+      "externalAfterMiB": 1614.7,
+      "arrayBuffersAfterMiB": 389.6
+    },
+    {
+      "sizeMiB": 128,
+      "status": "failed",
+      "errorCode": "EWEBASSEMBLY",
+      "errorMessage": "diff failed: native function returned -1",
+      "peakRssMiB": 851.4
+    }
+  ]
+}

@@ -22,6 +22,27 @@ class BsDiffPatchModule(reactContext: ReactApplicationContext) :
     support.diff(oldFile, newFile, patchFile, promise)
 
   @ReactMethod
+  fun inspectPatch(patchFile: String, maxInputBytes: Double, promise: Promise) =
+    support.inspectPatch(patchFile, maxInputBytes, promise)
+
+  @ReactMethod
+  fun verifyPatch(
+    oldFile: String,
+    patchFile: String,
+    expectedFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  ) = support.verifyPatch(
+    oldFile,
+    patchFile,
+    expectedFile,
+    maxInputBytes,
+    maxOutputBytes,
+    promise
+  )
+
+  @ReactMethod
   fun startPatch(
     jobId: String,
     oldFile: String,

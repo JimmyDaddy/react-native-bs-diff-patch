@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-07-20T06:10:29.044Z",
+  "runtime": {
+    "cpu": "Apple M3 Pro",
+    "compiler": "Apple clang version 17.0.0 (clang-1700.6.3.2)",
+    "platform": "darwin-arm64"
+  },
+  "workload": {
+    "description": "Deterministic files with one changed byte per 4 KiB",
+    "memoryMetric": "Peak resident set size for one diff and patch process"
+  },
+  "summary": {
+    "passed": 3,
+    "failed": 0
+  },
+  "results": [
+    {
+      "status": "passed",
+      "sizeMiB": 16,
+      "diffMs": 10012.4,
+      "patchMs": 70.7,
+      "patchBytes": 113,
+      "peakRssKiB": 316368
+    },
+    {
+      "status": "passed",
+      "sizeMiB": 64,
+      "diffMs": 41943.7,
+      "patchMs": 249,
+      "patchBytes": 189,
+      "peakRssKiB": 1256080
+    },
+    {
+      "status": "passed",
+      "sizeMiB": 128,
+      "diffMs": 101698.9,
+      "patchMs": 586.4,
+      "patchBytes": 323,
+      "peakRssKiB": 2486416
+    }
+  ]
+}

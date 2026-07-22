@@ -21,6 +21,21 @@ abstract class NativeBsDiffPatchSpec(
     promise: Promise
   )
 
+  abstract fun inspectPatch(
+    patchFile: String,
+    maxInputBytes: Double,
+    promise: Promise
+  )
+
+  abstract fun verifyPatch(
+    oldFile: String,
+    patchFile: String,
+    expectedFile: String,
+    maxInputBytes: Double,
+    maxOutputBytes: Double,
+    promise: Promise
+  )
+
   abstract fun startPatch(
     jobId: String,
     oldFile: String,

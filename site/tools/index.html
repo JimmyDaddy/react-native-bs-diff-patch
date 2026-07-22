@@ -759,6 +759,292 @@
         </section>
       </section>
 
+      <section class="utility-suite" aria-labelledby="utility-suite-title">
+        <header class="utility-suite-heading">
+          <div>
+            <p class="section-kicker">
+              <span class="lang-en">Shipping utilities</span>
+              <span class="lang-zh">分发辅助工具</span>
+            </p>
+            <h2 id="utility-suite-title">
+              <span class="lang-en"
+                >Turn patch evidence into release metadata.</span
+              >
+              <span class="lang-zh">把补丁验证结果转化为发布元数据。</span>
+            </h2>
+          </div>
+          <p class="lang-en">
+            Build an integrity manifest, quantify transfer savings, or turn an
+            error code into the next concrete debugging step.
+          </p>
+          <p class="lang-zh">
+            生成完整性清单、量化传输收益，或把错误码转化为下一步可执行的排障动作。
+          </p>
+        </header>
+
+        <div class="utility-grid">
+          <article class="utility-card utility-card-manifest">
+            <header>
+              <span class="utility-index">04 / MANIFEST</span>
+              <h3 class="lang-en">Integrity manifest</h3>
+              <h3 class="lang-zh">完整性清单</h3>
+              <p class="lang-en">
+                Hash a baseline, target, and patch into a portable JSON record
+                for your CDN or update service.
+              </p>
+              <p class="lang-zh">
+                计算基线、目标和补丁的哈希，生成可供 CDN 或更新服务使用的 JSON
+                记录。
+              </p>
+            </header>
+
+            <div class="manifest-files">
+              <label
+                class="file-drop compact-file-drop"
+                data-file-drop
+                for="manifest-old-file"
+              >
+                <input id="manifest-old-file" type="file" />
+                <span class="file-drop-number">01</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">Baseline</strong>
+                  <strong class="lang-zh">基线文件</strong>
+                  <span class="lang-en">Old release</span>
+                  <span class="lang-zh">旧版本</span>
+                </span>
+                <output data-file-summary="manifest-old-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+              <label
+                class="file-drop compact-file-drop"
+                data-file-drop
+                for="manifest-new-file"
+              >
+                <input id="manifest-new-file" type="file" />
+                <span class="file-drop-number">02</span>
+                <span class="file-drop-copy">
+                  <strong class="lang-en">Target</strong>
+                  <strong class="lang-zh">目标文件</strong>
+                  <span class="lang-en">New release</span>
+                  <span class="lang-zh">新版本</span>
+                </span>
+                <output data-file-summary="manifest-new-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+              <label
+                class="file-drop compact-file-drop"
+                data-file-drop
+                for="manifest-patch-file"
+              >
+                <input
+                  id="manifest-patch-file"
+                  type="file"
+                  accept=".patch,application/octet-stream"
+                />
+                <span class="file-drop-number">03</span>
+                <span class="file-drop-copy">
+                  <strong>Patch</strong>
+                  <span class="lang-en">Binary delta</span>
+                  <span class="lang-zh">二进制差量</span>
+                </span>
+                <output data-file-summary="manifest-patch-file"
+                  >{{NO_FILE_LABEL}}</output
+                >
+              </label>
+            </div>
+
+            <div class="utility-actions">
+              <button
+                id="manifest-run"
+                class="primary-button tool-run"
+                type="button"
+              >
+                <span class="lang-en">Generate manifest</span>
+                <span class="lang-zh">生成清单</span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <button
+                id="manifest-copy"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Copy JSON</span>
+                <span class="lang-zh">复制 JSON</span>
+              </button>
+              <button
+                id="manifest-download"
+                class="secondary-button"
+                type="button"
+                disabled
+              >
+                <span class="lang-en">Download</span>
+                <span class="lang-zh">下载</span>
+              </button>
+              <button
+                id="manifest-reset"
+                class="secondary-button"
+                type="button"
+              >
+                <span class="lang-en">Reset</span>
+                <span class="lang-zh">重置</span>
+              </button>
+            </div>
+            <strong
+              id="manifest-status"
+              class="utility-status"
+              data-state="idle"
+            >
+              {{READY_LABEL}}
+            </strong>
+            <pre
+              class="utility-output"
+            ><code id="manifest-output">—</code></pre>
+          </article>
+
+          <article class="utility-card">
+            <header>
+              <span class="utility-index">05 / SAVINGS</span>
+              <h3 class="lang-en">Transfer savings</h3>
+              <h3 class="lang-zh">传输节省计算器</h3>
+              <p class="lang-en">
+                Estimate the traffic avoided when clients download a patch
+                instead of the complete target.
+              </p>
+              <p class="lang-zh">
+                估算客户端下载补丁而非完整目标文件时可以节省的流量。
+              </p>
+            </header>
+            <div class="utility-fields">
+              <label>
+                <span class="lang-en">Target size / MiB</span>
+                <span class="lang-zh">目标大小 / MiB</span>
+                <input
+                  id="savings-target-mib"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="100"
+                />
+              </label>
+              <label>
+                <span class="lang-en">Patch size / MiB</span>
+                <span class="lang-zh">补丁大小 / MiB</span>
+                <input
+                  id="savings-patch-mib"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="12"
+                />
+              </label>
+              <label>
+                <span class="lang-en">Downloads</span>
+                <span class="lang-zh">下载次数</span>
+                <input
+                  id="savings-downloads"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="10000"
+                />
+              </label>
+            </div>
+            <div class="utility-metrics">
+              <div>
+                <span class="lang-en">Saving rate</span>
+                <span class="lang-zh">节省比例</span>
+                <strong id="savings-rate">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Per download</span>
+                <span class="lang-zh">单次节省</span>
+                <strong id="savings-per-download">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Total traffic</span>
+                <span class="lang-zh">总节省流量</span>
+                <strong id="savings-total">—</strong>
+              </div>
+              <div>
+                <span class="lang-en">Full downloads avoided</span>
+                <span class="lang-zh">等效完整下载</span>
+                <strong id="savings-equivalent">—</strong>
+              </div>
+            </div>
+            <strong
+              id="savings-status"
+              class="utility-status"
+              data-state="idle"
+            >
+              {{READY_LABEL}}
+            </strong>
+          </article>
+
+          <article class="utility-card">
+            <header>
+              <span class="utility-index">06 / DIAGNOSE</span>
+              <h3 class="lang-en">Error code explainer</h3>
+              <h3 class="lang-zh">错误码诊断器</h3>
+              <p class="lang-en">
+                Map a public error code to its platform, likely cause, and the
+                safest next action.
+              </p>
+              <p class="lang-zh">
+                将公开错误码映射到适用平台、常见原因和最安全的下一步动作。
+              </p>
+            </header>
+            <label class="diagnostic-select">
+              <span class="lang-en">Error code</span>
+              <span class="lang-zh">错误码</span>
+              <select id="diagnostic-code">
+                <option>EINVAL</option>
+                <option>ENOENT</option>
+                <option>EEXIST</option>
+                <option>EBUSY</option>
+                <option>EABORTED</option>
+                <option>ECANCELLED</option>
+                <option selected>ERESOURCE</option>
+                <option>EINPUT_TOO_LARGE</option>
+                <option>EOUTPUT_TOO_LARGE</option>
+                <option>EUNSUPPORTED</option>
+                <option>EUNAVAILABLE</option>
+                <option>EDIFF</option>
+                <option>EPATCH</option>
+                <option>EWEBASSEMBLY</option>
+                <option>EUNSPECIFIED</option>
+              </select>
+            </label>
+            <dl class="diagnostic-result">
+              <div>
+                <dt class="lang-en">Platform</dt>
+                <dt class="lang-zh">适用平台</dt>
+                <dd id="diagnostic-platform">—</dd>
+              </div>
+              <div>
+                <dt class="lang-en">Likely cause</dt>
+                <dt class="lang-zh">常见原因</dt>
+                <dd id="diagnostic-cause">—</dd>
+              </div>
+              <div>
+                <dt class="lang-en">Next action</dt>
+                <dt class="lang-zh">下一步动作</dt>
+                <dd id="diagnostic-action">—</dd>
+              </div>
+            </dl>
+            <pre
+              class="utility-output diagnostic-output"
+            ><code id="diagnostic-example">—</code></pre>
+            <button id="diagnostic-copy" class="secondary-button" type="button">
+              <span class="lang-en">Copy diagnosis</span>
+              <span class="lang-zh">复制诊断结果</span>
+            </button>
+          </article>
+        </div>
+      </section>
+
       <section class="tool-safety" aria-labelledby="tool-safety-title">
         <div>
           <p class="section-kicker">

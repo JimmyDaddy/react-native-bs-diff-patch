@@ -65,7 +65,7 @@ source-pattern assertions.
 `test:native-operations` deterministically covers job progress, cancellation,
 limits, malformed patches, atomic destination behavior, and temporary cleanup.
 
-Run the repeatable Web performance baseline with:
+Run the repeatable Web and native performance baselines with:
 
 ```sh
 yarn benchmark:web
@@ -73,6 +73,22 @@ BENCHMARK_OUTPUT=/tmp/web-wasm.json yarn benchmark:web
 yarn benchmark:native
 BENCHMARK_OUTPUT=/tmp/native-core.json yarn benchmark:native
 ```
+
+Each input size runs in a fresh process. Both reports include peak resident
+memory; the Web report also records the resident, external, and ArrayBuffer
+memory still live after the round trip. Use the non-blocking large-file profile
+before changing buffer ownership or the patch format:
+
+```sh
+BENCHMARK_OUTPUT=/tmp/web-large.json yarn benchmark:large:web
+BENCHMARK_OUTPUT=/tmp/native-large.json yarn benchmark:large:native
+```
+
+The large profile uses 16, 64, and 128 MiB fixtures and can consume several
+gigabytes of memory. It is intentionally not a pull-request gate. A manual
+`Native Core Benchmark` run accepts a comma-separated size list when a shared
+runner baseline is useful. Interpret the numbers with the scope and acceptance
+criteria in the [large-file roadmap](./large-files-v04.md).
 
 The published-package canaries install directly from npm and intentionally use
 current Vite and Expo toolchains. They are scheduled CI checks, not release

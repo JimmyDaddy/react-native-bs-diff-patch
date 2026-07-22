@@ -62,9 +62,22 @@ try {
     executable,
   ]);
 
-  const results = sizes.map((size) =>
-    JSON.parse(run(executable, [String(size)]))
-  );
+  const results = sizes.map((sizeMiB) => {
+    try {
+      return {
+        status: 'passed',
+        ...JSON.parse(run(executable, [String(sizeMiB)])),
+      };
+    } catch (error) {
+      return {
+        sizeMiB,
+        status: 'failed',
+        errorCode: 'ENATIVE',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+  const failed = results.filter((result) => result.status === 'failed').length;
   const report = {
     generatedAt: new Date().toISOString(),
     runtime: {
@@ -76,6 +89,10 @@ try {
       description: 'Deterministic files with one changed byte per 4 KiB',
       memoryMetric: 'Peak resident set size for one diff and patch process',
     },
+    summary: {
+      passed: results.length - failed,
+      failed,
+    },
     results,
   };
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
@@ -83,6 +100,9 @@ try {
     await writeFile(process.env.BENCHMARK_OUTPUT, serialized);
   }
   process.stdout.write(serialized);
+  if (failed > 0 && process.env.BENCHMARK_ALLOW_FAILURES !== '1') {
+    process.exitCode = 1;
+  }
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });
 }
