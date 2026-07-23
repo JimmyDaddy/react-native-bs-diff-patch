@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file. Releases use
 [Semantic Versioning](https://semver.org/) and are generated from Conventional
 Commits by release-it.
 
+## [0.4.0](https://github.com/JimmyDaddy/react-native-bs-diff-patch/compare/v0.3.0...v0.4.0) (2026-07-23)
+
+### Features
+
+- add cross-platform `inspectPatch()` and `verifyPatch()` APIs for inspecting
+  patch metadata and validating restored output byte-for-byte;
+- add native runtime coverage for metadata, malformed patches, mismatches, and
+  resource limits across Android and iOS;
+- add a bilingual browser-local Binary Patch Toolkit for creating, applying,
+  verifying, and inspecting patches without uploading files;
+- add large-file native and Web benchmark baselines plus an evidence-backed
+  roadmap for progress and streaming feasibility;
+- refresh the bilingual README, documentation site, favicon, and social preview.
+
+### Compatibility and validation
+
+- keep the native fuzz harness buildable on both Linux and macOS while
+  exercising the platform-specific atomic output path.
+
 ## [0.3.0](https://github.com/JimmyDaddy/react-native-bs-diff-patch/compare/v0.2.0...v0.3.0) (2026-07-20)
 
 ### Features

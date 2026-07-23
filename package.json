@@ -1,6 +1,6 @@
 {
   "name": "react-native-bs-diff-patch",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Create and apply compact binary patches across React Native Android, iOS, and Web",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
