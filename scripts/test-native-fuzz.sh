@@ -6,6 +6,11 @@ repository_directory=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 temporary_directory=$(mktemp -d)
 fuzz_runs="${FUZZ_RUNS:-5000}"
 compiler="${CC:-clang}"
+feature_test_macro=-D_POSIX_C_SOURCE=200809L
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  feature_test_macro=-D_DARWIN_C_SOURCE
+fi
 
 cleanup() {
   rm -rf "$temporary_directory"
@@ -14,7 +19,7 @@ trap cleanup EXIT INT TERM
 
 if "$compiler" \
   -std=c11 \
-  -D_POSIX_C_SOURCE=200809L \
+  "$feature_test_macro" \
   -g \
   -O1 \
   -fno-omit-frame-pointer \
@@ -37,7 +42,7 @@ if "$compiler" \
 else
   "$compiler" \
     -std=c11 \
-    -D_POSIX_C_SOURCE=200809L \
+    "$feature_test_macro" \
     -g \
     -O1 \
     -fno-omit-frame-pointer \
