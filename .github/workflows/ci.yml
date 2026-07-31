@@ -27,7 +27,7 @@ jobs:
       web: ${{ steps.changes.outputs.web }}
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -166,7 +166,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js and dependencies
         uses: ./.github/actions/setup
@@ -222,7 +222,7 @@ jobs:
         api-level: ${{ fromJSON(github.event_name == 'pull_request' && '[24,31]' || '[24,25,29,30,31]') }}
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js and dependencies
         uses: ./.github/actions/setup
@@ -292,7 +292,7 @@ jobs:
             architecture: new
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up JDK
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
@@ -318,13 +318,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js and dependencies
         uses: ./.github/actions/setup
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -411,7 +411,7 @@ jobs:
             runner: macos-14
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -419,7 +419,7 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -436,7 +436,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js and dependencies
         uses: ./.github/actions/setup
@@ -464,7 +464,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js and dependencies
         uses: ./.github/actions/setup
@@ -486,7 +486,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout the code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js and dependencies
         uses: ./.github/actions/setup
