@@ -3,6 +3,8 @@ import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { assertDeclarationValueExportsMatchRuntime } from './declaration-contract.mjs';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(
   await readFile(path.join(root, 'package.json'), 'utf8')
@@ -88,13 +90,7 @@ for (const [entry, declaration] of [
 ]) {
   const api = await import(pathToFileURL(path.join(root, entry)).href);
   const types = await readFile(path.join(root, declaration), 'utf8');
-  for (const name of Object.keys(api)) {
-    assert.match(
-      types,
-      new RegExp(`export (?:declare )?(?:function|class|const) ${name}\\b`),
-      `${entry} export ${name} must have a public declaration`
-    );
-  }
+  assertDeclarationValueExportsMatchRuntime(api, types, declaration);
 }
 console.log(
   `Package ${manifest.version}: exports, public declarations, assets and Node-free browser graph passed`

@@ -88,20 +88,23 @@ patch application uses the bounded streaming core. Try the workflow in the brows
 
 ## Install
 
+For React Native, Node.js, and CLI consumers:
+
 ```sh
 npm install react-native-bs-diff-patch@^0.5.0
 ```
 
-The explicit `/web` and `/toolkit` entries are part of 0.5.0. For pre-release
-verification of a locally prepared package, the same entries can be tested from
-its tarball instead:
+For standalone browser and desktop WebView consumers:
 
 ```sh
-npm install ./react-native-bs-diff-patch-0.5.0.tgz
+npm install bs-diff-patch-web@^0.5.0
 ```
 
-The registry's 0.4.x package predates these subpaths. See the [Web and desktop
-WebView SDK guide](./docs/web-sdk.md) for the resource graph and consumer checks.
+For pre-release verification of either locally prepared package, substitute its
+tarball in a clean consumer. The standalone Web package uses
+`bs-diff-patch-web-0.5.0.tgz`; the React Native package keeps its own tarball.
+See the [Web and desktop WebView SDK guide](./docs/web-sdk.md) for the resource
+graph, migration, and consumer checks.
 
 For iOS, install Pods and rebuild the native application:
 
@@ -156,14 +159,15 @@ try {
 
 ## Web: first round trip
 
-Standalone browser, Vite, and Tauri consumers should import the explicit ESM
-entry `react-native-bs-diff-patch/web`; it exposes byte APIs and does not
-require React Native. The root package keeps its conditional React Native and
-browser resolution for existing applications. See the [Web and desktop WebView
-SDK guide](./docs/web-sdk.md) for the published resource graph and CSP.
+Standalone browser, Vite, and Tauri consumers should install
+`bs-diff-patch-web` and import its ESM root; it exposes byte APIs without
+React Native, Node.js, or a Node sidecar. Existing applications can keep using
+`react-native-bs-diff-patch/web`, which remains supported. See the [Web and
+desktop WebView SDK guide](./docs/web-sdk.md) for the resource graph, migration,
+and CSP.
 
 ```ts
-import { diffBytes, patchBytes } from 'react-native-bs-diff-patch/web';
+import { diffBytes, patchBytes } from 'bs-diff-patch-web';
 
 const patchBytesValue = await diffBytes(oldFile, newFile, {
   signal: abortController.signal,
@@ -254,8 +258,9 @@ TypeScript resolution from the real npm package shape.
 ## Documentation
 
 - [Web and desktop WebView SDK](./docs/web-sdk.md) — use the explicit ESM
-  `/web` and `/toolkit` entries from Vite or Tauri without React Native or a
-  Node sidecar.
+  `bs-diff-patch-web` and its `/toolkit` entry from Vite or Tauri without React
+  Native or a Node sidecar. Existing `react-native-bs-diff-patch/web` and
+  `/toolkit` consumers remain supported.
 - [Getting started](./docs/getting-started.md)
 - [API reference](./docs/api-reference.md)
 - [Production recipes](./docs/recipes.md)

@@ -101,7 +101,11 @@
     "prepare": "bob build && node scripts/prepare-package.mjs && node scripts/check-package-contract.mjs",
     "prepack": "node scripts/check-package-contract.mjs",
     "build:web": "bash scripts/build-web-wasm.sh",
-    "release": "release-it"
+    "release": "release-it",
+    "build:web:package": "node scripts/build-web-package.mjs",
+    "check:web:package": "node scripts/check-web-package-contract.mjs",
+    "test:web:package": "yarn build:web:package && yarn check:web:package && node scripts/test-web-package-consumers.mjs",
+    "test:web:registry": "node --test scripts/test-web-package-registry.mjs"
   },
   "keywords": [
     "react-native",

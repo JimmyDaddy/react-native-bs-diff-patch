@@ -22,10 +22,26 @@ import puppeteer from 'puppeteer-core';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryDirectory = path.resolve(scriptDirectory, '..');
+const consumerProfile = process.env.SDK_CONSUMER_PROFILE || 'react-native';
+if (!['react-native', 'web'].includes(consumerProfile)) {
+  throw new Error(
+    `Unsupported SDK_CONSUMER_PROFILE=${consumerProfile}; expected react-native or web`
+  );
+}
+const standaloneWebProfile = consumerProfile === 'web';
+const primaryPackageName = standaloneWebProfile
+  ? 'bs-diff-patch-web'
+  : 'react-native-bs-diff-patch';
+const primaryImportPath = standaloneWebProfile
+  ? primaryPackageName
+  : `${primaryPackageName}/web`;
 const keepTemporaryDirectory = process.env.KEEP_SDK_CONSUMER_DIR === '1';
 const temporaryDirectory = await realpath(
   await mkdtemp(
-    path.join(os.tmpdir(), 'react-native-bs-diff-patch-sdk-consumers-')
+    path.join(
+      os.tmpdir(),
+      `${primaryPackageName.replaceAll('/', '-')}-sdk-consumers-`
+    )
   )
 );
 const chromeCandidates = [
@@ -134,7 +150,11 @@ async function prepareTarball() {
     return suppliedPath;
   }
 
-  const packageSpec = process.env.PACKAGE_SPEC;
+  const packageSpec =
+    process.env.PACKAGE_SPEC ||
+    (standaloneWebProfile
+      ? path.join(repositoryDirectory, 'build', 'web-package')
+      : undefined);
   const metadata = parseTrailingJson(
     run('npm', [
       'pack',
@@ -281,15 +301,26 @@ async function buildNativeFixture() {
   return executablePath;
 }
 
-function createBrowserEntry({ importPath, includeToolkit, includeProgress }) {
+function createBrowserEntry({
+  importPath,
+  packageName,
+  includeToolkit,
+  includeProgress,
+  crossImportPath,
+}) {
   const imports = ['diffBytes', 'inspectPatch', 'patchBytes', 'verifyPatch'];
   if (includeToolkit) {
     imports.push('startDiffBytes');
   }
   const lines = [`import { ${imports.join(', ')} } from '${importPath}';`];
+  if (crossImportPath) {
+    lines.push(
+      `import { diffBytes as crossDiffBytes, patchBytes as crossPatchBytes } from '${crossImportPath}';`
+    );
+  }
   if (includeToolkit) {
     lines.push(
-      "import { canonicalJson, createPatchManifest } from 'react-native-bs-diff-patch/toolkit';"
+      `import { canonicalJson, createPatchManifest } from '${packageName}/toolkit';`
     );
   }
   lines.push(
@@ -350,6 +381,14 @@ function createBrowserEntry({ importPath, includeToolkit, includeProgress }) {
       '  if (canonicalJson({ b: 1, a: 2 }) !== "{\\"a\\":2,\\"b\\":1}" || manifest.version !== 1) throw new Error("Toolkit consumer assertions failed");'
     );
   }
+  if (crossImportPath) {
+    lines.push(
+      '  const crossPatch = await crossDiffBytes(oldData, newData);',
+      '  const crossRestored = await patchBytes(oldData, crossPatch);',
+      '  const restoredByCross = await crossPatchBytes(oldData, patch);',
+      '  if (!sameBytes(crossRestored, newData) || !sameBytes(restoredByCross, newData)) throw new Error("Co-installed package patch compatibility assertions failed");'
+    );
+  }
   lines.push(
     '  return {',
     '    patch: toBase64(patch),',
@@ -372,9 +411,12 @@ function createBrowserEntry({ importPath, includeToolkit, includeProgress }) {
 async function writeConsumer({
   name,
   packageSpec,
+  packageName,
   importPath,
   includeToolkit,
   includeProgress,
+  additionalPackageSpecs = [],
+  crossImportPath,
 }) {
   const directory = path.join(temporaryDirectory, name);
   await mkdir(path.join(directory, 'src'), { recursive: true });
@@ -411,82 +453,137 @@ async function writeConsumer({
   );
   await writeFile(
     path.join(directory, 'src', 'main.ts'),
-    createBrowserEntry({ importPath, includeToolkit, includeProgress })
+    createBrowserEntry({
+      importPath,
+      packageName,
+      includeToolkit,
+      includeProgress,
+      crossImportPath,
+    })
   );
   if (includeToolkit) {
-    await writeFile(
-      path.join(directory, 'src', 'browser-types.ts'),
-      [
-        "import { startDiff as startRootDiff } from 'react-native-bs-diff-patch';",
-        "import { startDiff as startWebDiff, type BinaryOperationJob } from 'react-native-bs-diff-patch/web';",
-        'const input = new Uint8Array([1, 2, 3]);',
-        'const rootJob: BinaryOperationJob = startRootDiff(input, input);',
-        'const webJob: BinaryOperationJob = startWebDiff(input, input);',
-        'const rootResult: Promise<Uint8Array> = rootJob.result;',
-        'const webResult: Promise<Uint8Array> = webJob.result;',
-        '// @ts-expect-error Browser root types must reject native path arguments.',
-        "startRootDiff('old.bin', 'new.bin', 'update.patch');",
-        '// @ts-expect-error The explicit /web entry must reject native path arguments.',
-        "startWebDiff('old.bin', 'new.bin', 'update.patch');",
-        'void rootResult; void webResult;',
-        '',
-      ].join('\n')
-    );
-    await writeFile(
-      path.join(directory, 'src', 'native-types.ts'),
-      [
-        "import { startDiff } from 'react-native-bs-diff-patch';",
-        "import type { NativeOperationJob } from 'react-native-bs-diff-patch';",
-        "const nativeJob: NativeOperationJob = startDiff('old.bin', 'new.bin', 'update.patch');",
-        'const nativeResult: Promise<number> = nativeJob.result;',
-        'void nativeResult;',
-        '',
-      ].join('\n')
-    );
-    await writeFile(
-      path.join(directory, 'tsconfig.browser.json'),
-      `${JSON.stringify(
-        {
-          compilerOptions: {
-            customConditions: ['browser'],
-            lib: ['ES2022', 'DOM'],
-            module: 'NodeNext',
-            moduleResolution: 'NodeNext',
-            noEmit: true,
-            skipLibCheck: false,
-            strict: true,
-            target: 'ES2022',
+    if (standaloneWebProfile) {
+      await writeFile(
+        path.join(directory, 'src', 'web-types.ts'),
+        [
+          '// @ts-expect-error The standalone Web root must not expose native file APIs.',
+          `import { diff, patch } from '${packageName}';`,
+          `import { startDiff, type BinaryOperationJob } from '${packageName}';`,
+          'const input = new Uint8Array([1, 2, 3]);',
+          'const webJob: BinaryOperationJob = startDiff(input, input);',
+          'const webResult: Promise<Uint8Array> = webJob.result;',
+          '// @ts-expect-error The standalone Web root must reject native path arguments.',
+          "startDiff('old.bin', 'new.bin', 'update.patch');",
+          'void webResult;',
+          '',
+        ].join('\n')
+      );
+      for (const [filename, module, moduleResolution] of [
+        ['tsconfig.nodenext.json', 'NodeNext', 'NodeNext'],
+        ['tsconfig.bundler.json', 'ESNext', 'Bundler'],
+      ]) {
+        await writeFile(
+          path.join(directory, filename),
+          `${JSON.stringify(
+            {
+              compilerOptions: {
+                lib: ['ES2022', 'DOM'],
+                module,
+                moduleResolution,
+                noEmit: true,
+                skipLibCheck: false,
+                strict: true,
+                target: 'ES2022',
+              },
+              include: ['src/main.ts', 'src/web-types.ts'],
+            },
+            null,
+            2
+          )}\n`
+        );
+      }
+    } else {
+      await writeFile(
+        path.join(directory, 'src', 'browser-types.ts'),
+        [
+          "import { startDiff as startRootDiff } from 'react-native-bs-diff-patch';",
+          "import { startDiff as startWebDiff, type BinaryOperationJob } from 'react-native-bs-diff-patch/web';",
+          'const input = new Uint8Array([1, 2, 3]);',
+          'const rootJob: BinaryOperationJob = startRootDiff(input, input);',
+          'const webJob: BinaryOperationJob = startWebDiff(input, input);',
+          'const rootResult: Promise<Uint8Array> = rootJob.result;',
+          'const webResult: Promise<Uint8Array> = webJob.result;',
+          '// @ts-expect-error Browser root types must reject native path arguments.',
+          "startRootDiff('old.bin', 'new.bin', 'update.patch');",
+          '// @ts-expect-error The explicit /web entry must reject native path arguments.',
+          "startWebDiff('old.bin', 'new.bin', 'update.patch');",
+          'void rootResult; void webResult;',
+          '',
+        ].join('\n')
+      );
+      await writeFile(
+        path.join(directory, 'src', 'native-types.ts'),
+        [
+          "import { startDiff } from 'react-native-bs-diff-patch';",
+          "import type { NativeOperationJob } from 'react-native-bs-diff-patch';",
+          "const nativeJob: NativeOperationJob = startDiff('old.bin', 'new.bin', 'update.patch');",
+          'const nativeResult: Promise<number> = nativeJob.result;',
+          'void nativeResult;',
+          '',
+        ].join('\n')
+      );
+      await writeFile(
+        path.join(directory, 'tsconfig.browser.json'),
+        `${JSON.stringify(
+          {
+            compilerOptions: {
+              customConditions: ['browser'],
+              lib: ['ES2022', 'DOM'],
+              module: 'NodeNext',
+              moduleResolution: 'NodeNext',
+              noEmit: true,
+              skipLibCheck: false,
+              strict: true,
+              target: 'ES2022',
+            },
+            include: ['src/main.ts', 'src/browser-types.ts'],
           },
-          include: ['src/main.ts', 'src/browser-types.ts'],
-        },
-        null,
-        2
-      )}\n`
-    );
-    await writeFile(
-      path.join(directory, 'tsconfig.native.json'),
-      `${JSON.stringify(
-        {
-          compilerOptions: {
-            lib: ['ES2022', 'DOM'],
-            module: 'NodeNext',
-            moduleResolution: 'NodeNext',
-            noEmit: true,
-            skipLibCheck: false,
-            strict: true,
-            target: 'ES2022',
+          null,
+          2
+        )}\n`
+      );
+      await writeFile(
+        path.join(directory, 'tsconfig.native.json'),
+        `${JSON.stringify(
+          {
+            compilerOptions: {
+              lib: ['ES2022', 'DOM'],
+              module: 'NodeNext',
+              moduleResolution: 'NodeNext',
+              noEmit: true,
+              skipLibCheck: false,
+              strict: true,
+              target: 'ES2022',
+            },
+            include: ['src/native-types.ts'],
           },
-          include: ['src/native-types.ts'],
-        },
-        null,
-        2
-      )}\n`
-    );
+          null,
+          2
+        )}\n`
+      );
+    }
   }
 
   run(
     'npm',
-    ['install', '--no-audit', '--no-fund', '--prefer-offline', packageSpec],
+    [
+      'install',
+      '--no-audit',
+      '--no-fund',
+      '--prefer-offline',
+      packageSpec,
+      ...additionalPackageSpecs,
+    ],
     { cwd: directory }
   );
 
@@ -508,32 +605,28 @@ async function writeConsumer({
     false,
     `${name} dependency tree must not contain React Native`
   );
+  assert.equal(
+    Object.hasOwn(installedTree.dependencies || {}, 'react'),
+    false,
+    `${name} dependency tree must not contain React`
+  );
 
   if (includeToolkit) {
-    const typecheck = run(
-      process.execPath,
-      [
-        path.join(directory, 'node_modules/typescript/bin/tsc'),
-        '-p',
-        'tsconfig.browser.json',
-      ],
-      { cwd: directory }
-    );
-    assert.equal(typecheck, '', `${name} TypeScript consumer emitted output`);
-    const nativeTypecheck = run(
-      process.execPath,
-      [
-        path.join(directory, 'node_modules/typescript/bin/tsc'),
-        '-p',
-        'tsconfig.native.json',
-      ],
-      { cwd: directory }
-    );
-    assert.equal(
-      nativeTypecheck,
-      '',
-      `${name} native TypeScript consumer emitted output`
-    );
+    const typecheckConfigs = standaloneWebProfile
+      ? ['tsconfig.nodenext.json', 'tsconfig.bundler.json']
+      : ['tsconfig.browser.json', 'tsconfig.native.json'];
+    for (const config of typecheckConfigs) {
+      const typecheck = run(
+        process.execPath,
+        [path.join(directory, 'node_modules/typescript/bin/tsc'), '-p', config],
+        { cwd: directory }
+      );
+      assert.equal(
+        typecheck,
+        '',
+        `${name} TypeScript consumer emitted output for ${config}`
+      );
+    }
   }
   const buildOutput = run(
     process.execPath,
@@ -662,14 +755,29 @@ async function runBrowserConsumer(browser, directory, name) {
 
 async function assertPackContract(tarballPath) {
   const tarEntries = run('tar', ['-tf', tarballPath]);
-  for (const entry of [
-    'package/web/index.mjs',
-    'package/web/index.d.mts',
-    'package/web/worker.mjs',
-    'package/web/bsdiffpatch.browser.mjs',
-    'package/toolkit/index.mjs',
-    'package/toolkit/index.d.ts',
-  ]) {
+  const requiredEntries = standaloneWebProfile
+    ? [
+        'package/THIRD_PARTY_NOTICES.txt',
+        'package/index.mjs',
+        'package/index.d.mts',
+        'package/web/index.mjs',
+        'package/web/index.d.mts',
+        'package/web/worker.browser.mjs',
+        'package/web/operations.browser.mjs',
+        'package/web/operation-runtime.mjs',
+        'package/web/bsdiffpatch.browser.mjs',
+        'package/toolkit/index.mjs',
+        'package/toolkit/index.d.ts',
+      ]
+    : [
+        'package/web/index.mjs',
+        'package/web/index.d.mts',
+        'package/web/worker.mjs',
+        'package/web/bsdiffpatch.browser.mjs',
+        'package/toolkit/index.mjs',
+        'package/toolkit/index.d.ts',
+      ];
+  for (const entry of requiredEntries) {
     assert.match(
       tarEntries,
       new RegExp(`^${entry}$`, 'm'),
@@ -677,28 +785,80 @@ async function assertPackContract(tarballPath) {
     );
   }
   assert.doesNotMatch(tarEntries, /^package\/web\/progress_bridge\.c$/m);
+  if (standaloneWebProfile) {
+    assert.doesNotMatch(
+      tarEntries,
+      /^package\/web\/(?:bsdiffpatch|worker)\.mjs$/m,
+      'The standalone package must not include a Node-capable WebAssembly runtime'
+    );
+    assert.doesNotMatch(
+      tarEntries,
+      /^package\/(?:action|android|bin|cpp|example|examples|ios|lib|node|scripts|src)(?:\/|$)/m,
+      'The standalone package must not include React Native, native, Node, or source directories'
+    );
+    assert.doesNotMatch(
+      tarEntries,
+      /^package\/web\/.*\.(?:c|cc|cpp|h)$/m,
+      'The standalone package must not include browser C/C++ sources'
+    );
+  }
 }
 
-async function assertManifestContract(consumerDirectory, expectedVersion) {
+async function assertManifestContract(
+  consumerDirectory,
+  expectedVersion,
+  packageName
+) {
   const manifest = JSON.parse(
     await readFile(
-      path.join(
-        consumerDirectory,
-        'node_modules/react-native-bs-diff-patch/package.json'
-      ),
+      path.join(consumerDirectory, 'node_modules', packageName, 'package.json'),
       'utf8'
     )
   );
   assert.equal(manifest.version, expectedVersion);
-  assert.equal(manifest.exports['./web'].import, './web/index.mjs');
-  assert.equal(manifest.exports['./web'].types, './web/index.d.mts');
+  if (standaloneWebProfile) {
+    assert.equal(manifest.name, 'bs-diff-patch-web');
+    assert.equal(manifest.types, './index.d.mts');
+    assert.equal(manifest.exports['.'].import, './index.mjs');
+    assert.equal(manifest.exports['.'].types, './index.d.mts');
+    assert.equal(manifest.exports['.'].default, './index.mjs');
+    assert.equal(Object.hasOwn(manifest.exports, './web'), false);
+    assert.equal(Object.hasOwn(manifest.exports, './node'), false);
+    assert.equal(Object.hasOwn(manifest.exports['.'], 'require'), false);
+    assert.deepEqual(Object.keys(manifest.exports).sort(), [
+      '.',
+      './package.json',
+      './toolkit',
+    ]);
+    for (const field of [
+      'browser',
+      'bin',
+      'codegenConfig',
+      'dependencies',
+      'devDependencies',
+      'main',
+      'module',
+      'optionalDependencies',
+      'peerDependencies',
+      'react-native',
+    ]) {
+      assert.equal(
+        manifest[field],
+        undefined,
+        `Standalone Web package must not declare ${field}`
+      );
+    }
+  } else {
+    assert.equal(manifest.exports['./web'].import, './web/index.mjs');
+    assert.equal(manifest.exports['./web'].types, './web/index.d.mts');
+    assert.equal(
+      Object.hasOwn(manifest.exports['./web'], 'require'),
+      false,
+      'The ESM-only /web entry must not claim CommonJS support'
+    );
+  }
   assert.equal(manifest.exports['./toolkit'].import, './toolkit/index.mjs');
   assert.equal(manifest.exports['./toolkit'].types, './toolkit/index.d.ts');
-  assert.equal(
-    Object.hasOwn(manifest.exports['./web'], 'require'),
-    false,
-    'The ESM-only /web entry must not claim CommonJS support'
-  );
   assert.equal(
     Object.hasOwn(manifest.exports['./toolkit'], 'require'),
     false,
@@ -744,7 +904,7 @@ try {
   const tarballPath = await prepareTarball();
   await assertPackContract(tarballPath);
   const packedManifest = readPackedManifest(tarballPath);
-  assert.equal(packedManifest.name, 'react-native-bs-diff-patch');
+  assert.equal(packedManifest.name, primaryPackageName);
   const tarballIntegrity = createHash('sha512')
     .update(await readFile(tarballPath))
     .digest('base64');
@@ -752,17 +912,42 @@ try {
   const current = await writeConsumer({
     name: 'current-vite',
     packageSpec: tarballPath,
-    importPath: 'react-native-bs-diff-patch/web',
+    packageName: primaryPackageName,
+    importPath: primaryImportPath,
     includeToolkit: true,
     includeProgress: true,
   });
-  await assertManifestContract(current.directory, packedManifest.version);
+  await assertManifestContract(
+    current.directory,
+    packedManifest.version,
+    primaryPackageName
+  );
   await assertNoNodeRuntimeInBuild(current.directory, current.buildOutput);
+
+  const coinstalled = standaloneWebProfile
+    ? await writeConsumer({
+        name: 'coinstalled-rn-v050-vite',
+        packageSpec: tarballPath,
+        packageName: primaryPackageName,
+        importPath: primaryImportPath,
+        includeToolkit: false,
+        includeProgress: false,
+        additionalPackageSpecs: ['react-native-bs-diff-patch@0.5.0'],
+        crossImportPath: 'react-native-bs-diff-patch/web',
+      })
+    : undefined;
+  if (coinstalled) {
+    await assertNoNodeRuntimeInBuild(
+      coinstalled.directory,
+      coinstalled.buildOutput
+    );
+  }
 
   const registryTarballPath = await prepareRegistry040Tarball();
   const registry = await writeConsumer({
     name: 'registry-v040-vite',
     packageSpec: registryTarballPath,
+    packageName: 'react-native-bs-diff-patch',
     importPath: 'react-native-bs-diff-patch',
     includeToolkit: false,
     includeProgress: false,
@@ -778,13 +963,21 @@ try {
     ],
   });
   let currentBrowser;
+  let coinstalledBrowser;
   let registryBrowser;
   try {
     currentBrowser = await runBrowserConsumer(
       browser,
       current.directory,
-      `${packedManifest.version} /web`
+      `${packedManifest.name}@${packedManifest.version}`
     );
+    if (coinstalled) {
+      coinstalledBrowser = await runBrowserConsumer(
+        browser,
+        coinstalled.directory,
+        `${packedManifest.name}@${packedManifest.version} co-installed with React Native 0.5.0 /web`
+      );
+    }
     registryBrowser = await runBrowserConsumer(
       browser,
       registry.directory,
@@ -794,12 +987,12 @@ try {
     assert.deepEqual(
       fromBase64(await currentBrowser.applyPatch(registryBrowser.patch)),
       fromBase64(currentBrowser.target),
-      `${packedManifest.version} /web did not restore a registry 0.4.0 patch`
+      `${packedManifest.name}@${packedManifest.version} did not restore a registry 0.4.0 patch`
     );
     assert.deepEqual(
       fromBase64(await registryBrowser.applyPatch(currentBrowser.patch)),
       fromBase64(registryBrowser.target),
-      `registry 0.4.0 did not restore a ${packedManifest.version} /web patch`
+      `registry 0.4.0 did not restore a ${packedManifest.name}@${packedManifest.version} patch`
     );
 
     const nativeCli = await buildNativeFixture();
@@ -842,7 +1035,7 @@ try {
         )
       ),
       await readFile(targetPath),
-      `${packedManifest.version} /web did not restore a native-generated patch`
+      `${packedManifest.name}@${packedManifest.version} did not restore a native-generated patch`
     );
     assert.deepEqual(
       fromBase64(
@@ -855,12 +1048,15 @@ try {
     );
   } finally {
     await registryBrowser?.close();
+    await coinstalledBrowser?.close();
     await currentBrowser?.close();
     await browser.close();
   }
 
   console.log(
-    `SDK consumers passed: version=${
+    `SDK consumers passed: profile=${consumerProfile} package=${
+      packedManifest.name
+    }@${
       packedManifest.version
     } tarball=${tarballPath} sha512-${tarballIntegrity} registry040=${registry040Integrity} retained=${
       keepTemporaryDirectory ? temporaryDirectory : 'no'
@@ -869,6 +1065,8 @@ try {
   console.log(
     `SDK browser evidence: csp=${browserCsp} currentResources=${JSON.stringify(
       currentBrowser.resourceUrls
+    )} coinstalledResources=${JSON.stringify(
+      coinstalledBrowser?.resourceUrls || []
     )} registryResources=${JSON.stringify(registryBrowser.resourceUrls)}`
   );
 } finally {

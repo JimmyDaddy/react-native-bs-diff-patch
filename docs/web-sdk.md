@@ -2,33 +2,40 @@
 
 This guide is for a browser, Tauri 2 WebView, or another TypeScript
 application that needs the binary patch engine without installing React Native
-or starting a Node sidecar. The SDK operates on bytes. A desktop application
-still owns file dialogs, permissions, file reads and writes, temporary paths,
-job policy, and final replacement in its Rust or platform layer.
+or starting a Node sidecar. New Web-only consumers should use the standalone
+`bs-diff-patch-web` package. Existing `react-native-bs-diff-patch` consumers can
+keep their root, `/web`, and `/toolkit` imports. The SDK operates on bytes. A
+desktop application still owns file dialogs, permissions, file reads and writes,
+temporary paths, job policy, and final replacement in its Rust or platform
+layer.
 
 ## Use the public entries
 
-The package keeps the React Native root entry for existing applications and
-adds explicit ESM entries for browser consumers:
+The standalone package is the recommended public surface for Web and WebView
+consumers:
 
-| Import | Module format | Use |
-| --- | --- | --- |
-| `react-native-bs-diff-patch/web` | ESM | Browser and WebView byte APIs, Worker jobs, metadata inspection and verification |
-| `react-native-bs-diff-patch/toolkit` | ESM | Platform-neutral manifest, bundle and patch-header helpers |
-| `react-native-bs-diff-patch` | Conditional | Existing React Native API; browser bundlers may select its browser condition |
-| `react-native-bs-diff-patch/node` | ESM | Node filesystem operations and release tooling |
+| Import                               | Module format | Use                                                                              |
+| ------------------------------------ | ------------- | -------------------------------------------------------------------------------- |
+| `bs-diff-patch-web`                  | ESM           | Browser and WebView byte APIs, Worker jobs, metadata inspection and verification |
+| `bs-diff-patch-web/toolkit`          | ESM           | Platform-neutral manifest, bundle and patch-header helpers                       |
+| `react-native-bs-diff-patch/web`     | ESM           | Existing package's compatible Web surface                                        |
+| `react-native-bs-diff-patch/toolkit` | ESM           | Existing package's compatible toolkit surface                                    |
+| `react-native-bs-diff-patch`         | Conditional   | Existing React Native API; browser bundlers may select its browser condition     |
+| `react-native-bs-diff-patch/node`    | ESM           | Node filesystem operations and release tooling                                   |
 
-`/web` and `/toolkit` intentionally do not expose a separate CommonJS
-`require` entry. Use a bundler or a native ESM import. The root package keeps
-its existing CommonJS build for consumers that already depend on it; that
-compatibility path does not make path-based native APIs available in a WebView.
+The standalone root and `/toolkit` entries are ESM-only and intentionally do
+not expose a CommonJS `require` entry. The standalone package has no runtime
+dependencies or peer dependencies and contains no React Native, Node, or native
+source requirement. Use a bundler or a native ESM import. The existing package
+keeps its root CommonJS build and compatibility entries for consumers that
+already depend on it; those entries are not deprecated.
 
-The browser resource graph is part of the published package. The `/web`
-entry loads the browser WASM module from `web/bsdiffpatch.browser.mjs` through
-the module Worker graph. The Node entry keeps using `web/bsdiffpatch.mjs`,
-which includes the Node filesystem support needed by `/node` and the CLI. Do
-not alias one artifact to the other, import repository source paths, or add a
-CDN fallback. Vite and other standard ESM bundlers should retain the
+The standalone package owns its browser Worker/WASM resource graph inside its
+package artifact. The existing `/web` entry continues to load
+`web/bsdiffpatch.browser.mjs`, while the existing Node entry keeps using
+`web/bsdiffpatch.mjs` for `/node` and the CLI. Do not alias artifacts, import
+repository source paths, or add a CDN fallback. Vite and other standard ESM
+bundlers should retain the package Worker's
 `new Worker(new URL('./worker.browser.mjs', import.meta.url), { type: 'module' })`
 relationship.
 
@@ -37,20 +44,21 @@ relationship.
 Install the package in the application that owns the WebView:
 
 ```sh
-# Main install path for the 0.5.0 Web SDK:
-npm install react-native-bs-diff-patch@^0.5.0
+# Recommended standalone package for Web and WebView consumers:
+npm install bs-diff-patch-web@^0.5.0
 ```
 
-For pre-release verification of a locally prepared package, substitute its
-tarball:
+For pre-release verification of a locally prepared standalone package,
+substitute its tarball:
 
 ```sh
-npm install ./react-native-bs-diff-patch-0.5.0.tgz
+npm install ./bs-diff-patch-web-0.5.0.tgz
 ```
 
-The registry's 0.4.x package predates the `/web` and `/toolkit` subpaths. Do not
-use an unversioned registry install as a pre-release verification of those
-entries.
+React Native, Node, and CLI consumers should continue to install
+`react-native-bs-diff-patch@^0.5.0`. Its existing `/web` and `/toolkit` entries
+remain available for compatibility. Do not use an unversioned registry install
+as a pre-release verification of either package.
 
 The following code imports only the public Web entry and performs a real
 byte-to-byte round trip. It does not read a path and does not require React,
@@ -62,7 +70,7 @@ import {
   inspectPatch,
   patchBytes,
   verifyPatch,
-} from 'react-native-bs-diff-patch/web';
+} from 'bs-diff-patch-web';
 
 const encoder = new TextEncoder();
 const baseline = encoder.encode('release=1\nfeature=native\n');
@@ -120,7 +128,7 @@ Use a binary job when a UI needs progress, an explicit Cancel action, or a
 separate operation lifecycle:
 
 ```ts
-import { startPatchBytes } from 'react-native-bs-diff-patch/web';
+import { startPatchBytes } from 'bs-diff-patch-web';
 
 const job = startPatchBytes(oldFile, patchFile, {
   maxInputBytes: 64 * 1024 * 1024,
@@ -194,19 +202,19 @@ ceiling when the toolchain or generated WASM build changes.
 Errors are ordinary `Error` values with a best-effort string `code`. Branch
 on the code, not diagnostic message text:
 
-| Code | Meaning |
-| --- | --- |
-| `EINVAL` | Malformed or unsupported input type, or invalid option (native empty or duplicate paths are also invalid; zero-byte binary inputs are valid) |
-| `EUNSUPPORTED` | Web Worker or the selected platform API is unavailable |
-| `EABORTED` | A Web signal or job was cancelled |
-| `ERESOURCE` | An input/output bound or detectable runtime allocation limit was exceeded |
-| `EPATCH` | The patch header or patch payload is malformed or unsupported |
-| `EWEBASSEMBLY` | Worker startup, resource loading, or an unclassified WASM failure |
+| Code           | Meaning                                                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EINVAL`       | Malformed or unsupported input type, or invalid option (native empty or duplicate paths are also invalid; zero-byte binary inputs are valid) |
+| `EUNSUPPORTED` | Web Worker or the selected platform API is unavailable                                                                                       |
+| `EABORTED`     | A Web signal or job was cancelled                                                                                                            |
+| `ERESOURCE`    | An input/output bound or detectable runtime allocation limit was exceeded                                                                    |
+| `EPATCH`       | The patch header or patch payload is malformed or unsupported                                                                                |
+| `EWEBASSEMBLY` | Worker startup, resource loading, or an unclassified WASM failure                                                                            |
 
 `inspectPatch()` is a cheap header inspection. It reads at most the 24-byte
 header from a binary input and does not apply or authenticate the patch.
-`inspectPatchHeader()` from `/toolkit` has the same header-only purpose for a
-caller's `Uint8Array`. `valid: true` means that the magic and declared
+`inspectPatchHeader()` from `bs-diff-patch-web/toolkit` has the same header-only
+purpose for a caller's `Uint8Array`. `valid: true` means that the magic and declared
 target-size header fields are structurally acceptable; it does not prove that
 compressed payload blocks are intact, that the baseline is correct, or that a
 signature is valid. Use `verifyPatch()` and a trusted digest/signature policy
@@ -237,7 +245,7 @@ import {
   createPatchManifest,
   selectPatch,
   signingPayload,
-} from 'react-native-bs-diff-patch/toolkit';
+} from 'bs-diff-patch-web/toolkit';
 
 const manifest = createPatchManifest({
   baseline: { bytes: 1000, sha256: baselineSha256 },
@@ -281,16 +289,18 @@ verify its digest, and then run `patchBytes()` and `verifyPatch()` as needed.
 ## Vite and Tauri packaging checklist
 
 Use the package name in application source and let the bundler follow its
-exports. A production build should contain the `/web` entry's module Worker
-and browser WASM resource graph. With the single-file WASM build, the binary
-payload is embedded in the generated browser module; consumers do not need to
-copy an independent `.wasm` file or install Emscripten.
+exports. A production build should contain the standalone root entry's module
+Worker and browser WASM resource graph. With the single-file WASM build, the
+binary payload is embedded in the generated browser module; consumers do not
+need to copy an independent `.wasm` file or install Emscripten.
 
 Before shipping, inspect the production bundle and run it from the built
 assets, including with network access disabled. Confirm that:
 
-- `react-native-bs-diff-patch/web` and `/toolkit` resolve from the installed
-  tarball, with no workspace link, source alias, or private deep import;
+- `bs-diff-patch-web` and `bs-diff-patch-web/toolkit` resolve from the installed
+  standalone tarball, with no workspace link, source alias, or private deep import;
+- existing `react-native-bs-diff-patch/web` and `/toolkit` compatibility imports
+  remain available when an application intentionally uses the RN package;
 - the Worker URL resolves to a packaged same-origin asset;
 - browser WASM loads from the package resource graph, not a CDN;
 - the production app can generate, apply and verify a patch after the network
@@ -321,13 +331,16 @@ yarn test:web:browser
 yarn test:web:metro
 yarn test:toolkit
 yarn test:sdk
+yarn test:web:package
+yarn test:web:registry
 yarn typecheck
 yarn site:build
 yarn site:test
 ```
 
-`yarn test:sdk` installs a prepared package tarball into an isolated consumer
-and checks the public `/web` and `/toolkit` ESM entries, production Vite
-resource loading and byte round trips. Registry smoke checks are a separate
+`yarn test:sdk` preserves the RN package `/web` and `/toolkit` consumer checks.
+`yarn test:web:package` builds and checks the standalone package tarball, then
+installs it into an isolated consumer and checks its root and `/toolkit` ESM
+entries, production Vite resource loading and byte round trips. Registry smoke checks are a separate
 post-release check. These checks do not constitute a Tauri device acceptance
 test or a claim that registry smoke has passed.

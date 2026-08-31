@@ -1,30 +1,33 @@
 # Web 与桌面 WebView SDK
 
 本指南面向浏览器、Tauri 2 WebView 或其他 TypeScript 应用：在不安装
-React Native、也不启动 Node sidecar 的情况下使用二进制补丁引擎。SDK 处理的是
-字节；桌面应用仍负责文件选择、权限、读写文件、临时路径、任务策略，以及由 Rust
-或平台层执行最终替换。
+React Native、也不启动 Node sidecar 的情况下使用二进制补丁引擎。新的 Web-only 消费者
+应使用独立的 `bs-diff-patch-web` 包。已有 `react-native-bs-diff-patch` 消费者可以继续
+使用根入口、`/web` 和 `/toolkit`。SDK 处理的是字节；桌面应用仍负责文件选择、权限、
+读写文件、临时路径、任务策略，以及由 Rust 或平台层执行最终替换。
 
 ## 使用公开入口
 
-包保留现有 React Native 根入口，并为浏览器消费者提供明确的 ESM 入口：
+独立包是 Web 与 WebView 消费者推荐使用的公开界面：
 
-| 导入路径 | 模块格式 | 用途 |
-| --- | --- | --- |
-| `react-native-bs-diff-patch/web` | ESM | 浏览器与 WebView 字节 API、Worker job、元数据检查与验证 |
-| `react-native-bs-diff-patch/toolkit` | ESM | 与平台无关的 manifest、bundle 与补丁头工具 |
-| `react-native-bs-diff-patch` | 条件入口 | 既有 React Native API；浏览器打包器可以选择 browser 条件 |
-| `react-native-bs-diff-patch/node` | ESM | Node 文件系统操作和发布工具 |
+| 导入路径                             | 模块格式 | 用途                                                     |
+| ------------------------------------ | -------- | -------------------------------------------------------- |
+| `bs-diff-patch-web`                  | ESM      | 浏览器与 WebView 字节 API、Worker job、元数据检查与验证  |
+| `bs-diff-patch-web/toolkit`          | ESM      | 与平台无关的 manifest、bundle 与补丁头工具               |
+| `react-native-bs-diff-patch/web`     | ESM      | 已有包的兼容 Web 界面                                    |
+| `react-native-bs-diff-patch/toolkit` | ESM      | 已有包的兼容 toolkit 界面                                |
+| `react-native-bs-diff-patch`         | 条件入口 | 既有 React Native API；浏览器打包器可以选择 browser 条件 |
+| `react-native-bs-diff-patch/node`    | ESM      | Node 文件系统操作和发布工具                              |
 
-`/web` 与 `/toolkit` 有意不提供单独的 CommonJS `require` 入口。请使用打包器或原生
-ESM 导入。根包继续保留已有 CommonJS 构建，供依赖该路径的消费者使用；这条兼容路径
-不会让 WebView 获得基于路径的原生 API。
+独立包的根入口与 `/toolkit` 只提供 ESM，有意不提供 CommonJS `require` 入口。独立包没有
+runtime dependencies 或 peerDependencies，也不要求 React Native、Node 或原生源码。请使用
+打包器或原生 ESM 导入。已有包继续保留根入口的 CommonJS 构建和兼容入口；这些入口不会
+弃用。
 
-浏览器资源图属于发布包的一部分。`/web` 入口通过模块 Worker 图加载
-`web/bsdiffpatch.browser.mjs` 中的浏览器 WASM 模块。Node 入口继续使用
-`web/bsdiffpatch.mjs`，为 `/node` 与 CLI 提供所需的 Node 文件系统支持。不要把两份
-产物互相 alias，不要导入仓库源码路径，也不要添加 CDN fallback。Vite 和其他标准 ESM
-打包器应保留
+独立包在自身包 artifact 内管理浏览器 Worker/WASM 资源图。已有 `/web` 入口继续加载
+`web/bsdiffpatch.browser.mjs`，已有 Node 入口继续使用 `web/bsdiffpatch.mjs`，为 `/node`
+与 CLI 提供支持。不要互相 alias 产物，不要导入仓库源码路径，也不要添加 CDN fallback。
+Vite 和其他标准 ESM 打包器应保留包内 Worker 的
 `new Worker(new URL('./worker.browser.mjs', import.meta.url), { type: 'module' })` 关系。
 
 ## 最小 Vite 或 Tauri 往返
@@ -32,18 +35,19 @@ ESM 导入。根包继续保留已有 CommonJS 构建，供依赖该路径的消
 在拥有 WebView 的应用中安装包：
 
 ```sh
-# 0.5.0 Web SDK 的主安装路径：
-npm install react-native-bs-diff-patch@^0.5.0
+# Web 与 WebView 消费者推荐的独立包：
+npm install bs-diff-patch-web@^0.5.0
 ```
 
-发布前验证本地准备的包时，可以将其替换为 tarball：
+发布前验证本地准备的独立包时，可以将其替换为 tarball：
 
 ```sh
-npm install ./react-native-bs-diff-patch-0.5.0.tgz
+npm install ./bs-diff-patch-web-0.5.0.tgz
 ```
 
-registry 中的 0.4.x 包尚未包含 `/web` 和 `/toolkit` 子路径。发布前验证这些入口时，不要
-使用未带版本的 registry 安装命令作为验证依据。
+React Native、Node 和 CLI 消费者应继续安装 `react-native-bs-diff-patch@^0.5.0`；其已有
+`/web` 和 `/toolkit` 入口继续用于兼容。发布前验证任一包时，不要使用未带版本的 registry
+安装命令作为验证依据。
 
 下面的代码只导入公开 Web 入口，执行真实的逐字节往返。它不读取路径，也不需要
 React、React Native、Node 或服务器接口：
@@ -54,7 +58,7 @@ import {
   inspectPatch,
   patchBytes,
   verifyPatch,
-} from 'react-native-bs-diff-patch/web';
+} from 'bs-diff-patch-web';
 
 const encoder = new TextEncoder();
 const baseline = encoder.encode('release=1\nfeature=native\n');
@@ -107,7 +111,7 @@ Worker 内通过只读 WORKERFS 挂载供 C 核心读取，开始操作前不会
 需要界面进度、明确的取消操作或独立任务生命周期时，使用二进制 job：
 
 ```ts
-import { startPatchBytes } from 'react-native-bs-diff-patch/web';
+import { startPatchBytes } from 'bs-diff-patch-web';
 
 const job = startPatchBytes(oldFile, patchFile, {
   maxInputBytes: 64 * 1024 * 1024,
@@ -166,18 +170,18 @@ Worker 操作结束时，库会删除由操作拥有的 MEMFS 文件和监听器
 错误是带有尽力分类字符串 `code` 的普通 `Error`。需要分支时使用 code，不要依赖错误
 消息文本：
 
-| Code | 含义 |
-| --- | --- |
-| `EINVAL` | 类型格式错误、不支持的输入类型或非法选项（原生空路径或重复路径也无效；零字节二进制输入有效） |
-| `EUNSUPPORTED` | Web Worker 或选择的平台 API 不可用 |
-| `EABORTED` | Web signal 或 job 被取消 |
-| `ERESOURCE` | 超过输入/输出边界，或可识别的运行时分配限制 |
-| `EPATCH` | 补丁头或补丁 payload 损坏或不支持 |
-| `EWEBASSEMBLY` | Worker 启动、资源加载或未分类的 WASM 失败 |
+| Code           | 含义                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| `EINVAL`       | 类型格式错误、不支持的输入类型或非法选项（原生空路径或重复路径也无效；零字节二进制输入有效） |
+| `EUNSUPPORTED` | Web Worker 或选择的平台 API 不可用                                                           |
+| `EABORTED`     | Web signal 或 job 被取消                                                                     |
+| `ERESOURCE`    | 超过输入/输出边界，或可识别的运行时分配限制                                                  |
+| `EPATCH`       | 补丁头或补丁 payload 损坏或不支持                                                            |
+| `EWEBASSEMBLY` | Worker 启动、资源加载或未分类的 WASM 失败                                                    |
 
 `inspectPatch()` 是低成本的头部检查。它从二进制输入最多读取 24 字节头，不应用也不
-认证补丁。`/toolkit` 的 `inspectPatchHeader()` 对调用方提供的 `Uint8Array` 具有相同
-的只检查头部目的。`valid: true` 只表示 magic 和声明的目标大小头字段在结构上可接受；
+认证补丁。`bs-diff-patch-web/toolkit` 的 `inspectPatchHeader()` 对调用方提供的
+`Uint8Array` 具有相同的只检查头部目的。`valid: true` 只表示 magic 和声明的目标大小头字段在结构上可接受；
 不表示压缩 payload 完整、不表示基线正确，也不表示签名有效。替换应用数据前应结合
 `verifyPatch()` 与可信摘要/签名策略。
 
@@ -202,7 +206,7 @@ import {
   createPatchManifest,
   selectPatch,
   signingPayload,
-} from 'react-native-bs-diff-patch/toolkit';
+} from 'bs-diff-patch-web/toolkit';
 
 const manifest = createPatchManifest({
   baseline: { bytes: 1000, sha256: baselineSha256 },
@@ -236,14 +240,15 @@ artifact 的摘要，然后按需要运行 `patchBytes()` 和 `verifyPatch()`。
 
 ## Vite 与 Tauri 打包检查清单
 
-在应用源码中使用包名，让打包器依据 exports 解析。生产构建必须包含 `/web` 入口的
-模块 Worker 与浏览器 WASM 资源图。当前采用单文件 WASM 构建时，二进制 payload 嵌入
-生成的浏览器模块；消费者不需要复制独立 `.wasm` 文件，也不需要安装 Emscripten。
+在应用源码中使用包名，让打包器依据 exports 解析。生产构建必须包含独立包根入口的模块
+Worker 与浏览器 WASM 资源图。当前采用单文件 WASM 构建时，二进制 payload 嵌入生成的
+浏览器模块；消费者不需要复制独立 `.wasm` 文件，也不需要安装 Emscripten。
 
 发布前应检查生产 bundle，并在断网条件下从构建产物运行，至少确认：
 
-- `react-native-bs-diff-patch/web` 与 `/toolkit` 从安装的 tarball 解析，不使用 workspace
-  link、源码 alias 或私有深路径；
+- `bs-diff-patch-web` 与 `bs-diff-patch-web/toolkit` 从安装的独立包 tarball 解析，不使用
+  workspace link、源码 alias 或私有深路径；
+- 应用有意使用 RN 包时，已有 `react-native-bs-diff-patch/web` 与 `/toolkit` 兼容导入仍可用；
 - Worker URL 解析到随包发布的同源资源；
 - 浏览器 WASM 从包资源图加载，而不是 CDN；
 - 断网后生产应用仍能生成、应用和验证补丁；
@@ -271,11 +276,14 @@ yarn test:web:browser
 yarn test:web:metro
 yarn test:toolkit
 yarn test:sdk
+yarn test:web:package
+yarn test:web:registry
 yarn typecheck
 yarn site:build
 yarn site:test
 ```
 
-其中 `yarn test:sdk` 会把准备好的 tarball 安装到隔离消费者中，检查公开 `/web`、
-`/toolkit` ESM 入口、生产 Vite 资源加载和字节往返。Registry smoke 属于独立的发布后
-检查；这些检查不等于 Tauri 真机验收，也不宣称 registry smoke 已通过。
+其中 `yarn test:sdk` 保留 RN 包 `/web` 与 `/toolkit` 的消费者检查。
+`yarn test:web:package` 构建并检查独立包 tarball，在隔离消费者中验证包根、
+`/toolkit` ESM、生产 Vite 资源加载和字节往返。Registry smoke 属于独立的发布后检查；
+这些检查不等于 Tauri 真机验收，也不宣称 registry smoke 已通过。

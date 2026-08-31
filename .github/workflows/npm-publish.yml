@@ -21,6 +21,7 @@ concurrency:
 jobs:
   publish-npm:
     name: Publish to npm with OIDC
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

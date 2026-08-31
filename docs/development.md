@@ -43,9 +43,12 @@ yarn test:sdk
   TurboModule facade.
 - `test:package` installs the real tarball into a clean consumer and verifies
   browser, ESM, CommonJS, TypeScript, and optional-peer behavior.
-- `test:sdk` installs the prepared tarball into an isolated Vite consumer and
-  verifies the explicit `/web` and `/toolkit` ESM entries, production resource
-  loading, and real byte round trips.
+- `test:sdk` installs the prepared RN tarball into an isolated Vite consumer and
+  verifies `/web` and `/toolkit`, production resource loading, and real byte round trips.
+- `test:web:package` builds and checks the separate Web tarball, then verifies its
+  root and `/toolkit` in a clean consumer without RN dependencies.
+- `test:web:registry` checks publication guards for missing versions, mismatched
+  contents, network errors, signatures metadata, and provenance policy.
 
 ## Native robustness and compatibility
 
@@ -187,6 +190,14 @@ The npm package's Trusted Publisher is already configured with these values:
 
 No npm-side change is required for a normal release, and the workflow does not
 use a long-lived npm token.
+
+The checklist above is for the existing `react-native-bs-diff-patch` package.
+The standalone `bs-diff-patch-web` package is released independently under the
+`web-v0.5.0` tag namespace and does not replace, deprecate, or republish the
+React Native package. Keep Node filesystem operations, the CLI, and their
+release tooling on `react-native-bs-diff-patch`. The [standalone Web design](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/docs/standalone-web-package-design.md)
+documents the local first release, subsequent Trusted Publishing setup,
+`web-npm-publish.yml`, and byte-identical retry policy.
 
 ## Recovering a failed npm publication
 
