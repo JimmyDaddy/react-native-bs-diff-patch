@@ -1,4 +1,4 @@
-# Large-file roadmap (v0.4)
+# Large-file roadmap
 
 This document defines how the project will evaluate larger inputs, expose
 honest progress, and investigate streaming without weakening patch
@@ -10,12 +10,14 @@ every browser or mobile device can process a particular file size.
 The current diff algorithm needs random access to the complete old and new
 inputs while building and traversing its suffix array. Native calls therefore
 operate on file paths but still allocate memory proportional to the input. The
-Web implementation additionally moves complete buffers between JavaScript, a
-Worker, and WebAssembly linear memory.
+Web implementation still transfers typed-array inputs into a Worker and
+WebAssembly linear memory; `Blob`/`File` inputs avoid the extra main-thread copy
+through WORKERFS. Node release tools mount host paths through NODEFS.
 
-Patch application is less demanding than diff generation, but the current C
-and Web boundaries still materialize the complete operation state. Resource
-limits prevent unbounded work; they do not make the algorithm streaming.
+Patch application now reads the old file and compressed patch in 64 KiB
+chunks and writes a sibling temporary output incrementally. Web still returns a
+complete `Uint8Array`, so the browser boundary materializes the final result
+even though the C core no longer allocates complete old and output buffers.
 
 ## Measurement matrix
 
@@ -45,26 +47,24 @@ on lower-memory devices.
 
 The initial Apple M3 Pro / Node 22 record is checked in under `benchmarks/`.
 Native completed 128 MiB with approximately 2.37 GiB peak RSS. Web completed
-64 MiB with approximately 2.09 GiB peak RSS, while 128 MiB returned the generic
-`EWEBASSEMBLY` error. That generic failure remains an error-taxonomy gap and
-means the project does not currently claim 128 MiB Web diff support.
+64 MiB with approximately 2.09 GiB peak RSS, while 128 MiB exhausted the
+WebAssembly memory budget. Web classifies that failure as `ERESOURCE`; the
+project still does not claim 128 MiB Web diff support.
 
 ## Progress semantics
 
 Progress must be produced by real algorithm checkpoints, never a timer or an
-animation that guesses completion. A future cross-platform operation can use
-the existing stages:
+animation that guesses completion. Cross-platform jobs use these stages:
 
 - `reading`: validating inputs and loading the data required by the core.
 - `processing`: suffix-array/diff work or patch reconstruction.
 - `writing`: persisting and atomically committing native output; Web completes
   this stage when the result buffer is ready to transfer.
 
-Native jobs already expose these stages. Web parity requires Worker messages
-emitted from instrumented C/WebAssembly boundaries. Until those checkpoints
-exist, Web should report only start, cancellation, and completion rather than
-synthetic percentages. The public callback remains optional and must not change
-the result or error behavior when it is absent.
+Native and Web jobs expose these stages. Web progress travels from instrumented
+C checkpoints through WebAssembly and Worker messages; no timer or synthetic
+percentage is used. The public callback remains optional and does not change
+result or error behavior when absent.
 
 ## Streaming feasibility
 
@@ -73,21 +73,20 @@ algorithm: suffix-array construction and matching require global random access
 to both inputs. Supporting it would mean selecting a different algorithm or a
 new patch format, with an explicit compatibility and migration decision.
 
-Patch application is a better candidate for incremental work. A prototype can
-read the old file and compressed control/diff/extra streams in bounded chunks,
-write a temporary destination, and retain the current `ENDSLEY/BSDIFF43`
-contract. Browser support should start with `Blob`/`File` and an internal
-bounded reader; writable file handles can remain a progressive enhancement.
+Patch application uses a bounded C implementation that reads the old file and
+compressed control/diff/extra stream in chunks, writes a temporary destination,
+and retains the `ENDSLEY/BSDIFF43` contract. `Blob`/`File` inputs use read-only
+WORKERFS mounts in browsers. Direct browser file-handle output remains a
+progressive enhancement because the public API still returns a complete buffer.
 
 ## Delivery sequence
 
 1. Keep 16/64/128 MiB time and peak-memory baselines for native and Web.
-2. Instrument core checkpoints and add truthful Web progress events without
-   changing the existing `diff`, `patch`, or `startPatch` contracts.
-3. Prototype file-backed, incremental patch application and prove cancellation,
-   resource limits, temporary cleanup, and byte-for-byte compatibility.
-4. Decide whether the measured benefit justifies a new public API. Treat a
-   streaming diff algorithm or new patch format as a separate proposal.
+2. Measure the completed C/WASM progress and bounded patch path on comparable
+   devices, including peak memory before and after the change.
+3. Evaluate direct browser writable-file output without weakening cancellation,
+   resource limits, cleanup, or byte-for-byte compatibility.
+4. Treat a streaming diff algorithm or new patch format as a separate proposal.
 
 Any production API must preserve deterministic output validation, reject sizes
 outside configured limits before large allocations where possible, clean up on

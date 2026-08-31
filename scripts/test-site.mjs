@@ -23,32 +23,45 @@ const requiredFiles = [
   'assets/site.js',
   'assets/playground.js',
   'assets/tools.js',
+  'assets/planner.js',
   'assets/social-preview.png',
   'web/index.mjs',
   'web/worker.mjs',
   'web/operations.mjs',
   'web/bsdiffpatch.mjs',
+  'web/bsdiffpatch.browser.mjs',
+  'web/operations.browser.mjs',
+  'web/operation-runtime.mjs',
+  'web/worker.browser.mjs',
+  'docs/web-sdk/index.html',
+  'docs/zh-CN/web-sdk/index.html',
   'zh-CN/index.html',
   'tools/index.html',
   'zh-CN/tools/index.html',
+  'planner/index.html',
+  'zh-CN/planner/index.html',
+  'toolkit/index.mjs',
+  'toolkit/index.d.ts',
   'docs/index.html',
   'docs/getting-started/index.html',
   'docs/api-reference/index.html',
   'docs/recipes/index.html',
+  'docs/verified-delta-pipeline/index.html',
   'docs/platform-support/index.html',
   'docs/architecture/index.html',
   'docs/native-operations-v03/index.html',
-  'docs/large-files-v04/index.html',
+  'docs/large-files-roadmap/index.html',
   'docs/troubleshooting/index.html',
   'docs/development/index.html',
   'docs/zh-CN/index.html',
   'docs/zh-CN/getting-started/index.html',
   'docs/zh-CN/api-reference/index.html',
   'docs/zh-CN/recipes/index.html',
+  'docs/zh-CN/verified-delta-pipeline/index.html',
   'docs/zh-CN/platform-support/index.html',
   'docs/zh-CN/architecture/index.html',
   'docs/zh-CN/native-operations-v03/index.html',
-  'docs/zh-CN/large-files-v04/index.html',
+  'docs/zh-CN/large-files-roadmap/index.html',
   'docs/zh-CN/troubleshooting/index.html',
   'docs/zh-CN/development/index.html',
 ];
@@ -75,6 +88,10 @@ assert.match(
 assert.match(
   await readFile(path.join(outputDirectory, 'sitemap.xml'), 'utf8'),
   /https:\/\/bs-dff-patch\.corerobin\.com\/zh-CN\/tools\//
+);
+assert.match(
+  await readFile(path.join(outputDirectory, 'sitemap.xml'), 'utf8'),
+  /https:\/\/bs-dff-patch\.corerobin\.com\/planner\//
 );
 
 async function htmlFiles(directory) {
@@ -258,6 +275,26 @@ assert.match(chineseToolsPage, /完整性清单/);
 assert.match(chineseToolsPage, /传输节省计算器/);
 assert.match(chineseToolsPage, /错误码诊断器/);
 assert.match(chineseToolsPage, /href="\/tools\/"\s+hreflang="en"/);
+
+const plannerPage = await readFile(
+  path.join(outputDirectory, 'planner/index.html'),
+  'utf8'
+);
+assert.match(plannerPage, /<html lang="en">/);
+assert.match(plannerPage, /id="planner-baseline-files"/);
+assert.match(plannerPage, /id="planner-target-file"/);
+assert.match(plannerPage, /id="planner-max-ratio"/);
+assert.match(plannerPage, /id="planner-matrix"/);
+assert.match(plannerPage, /assets\/planner\.js/);
+assert.match(plannerPage, /Release Planner/);
+
+const chinesePlannerPage = await readFile(
+  path.join(outputDirectory, 'zh-CN/planner/index.html'),
+  'utf8'
+);
+assert.match(chinesePlannerPage, /<html lang="zh-CN">/);
+assert.match(chinesePlannerPage, /多基线补丁矩阵/);
+assert.match(chinesePlannerPage, /href="\/planner\/"\s+hreflang="en"/);
 assert.doesNotMatch(chineseToolsPage, /\{\{[A-Z0-9_]+\}\}/);
 
 function pngDimensions(buffer) {

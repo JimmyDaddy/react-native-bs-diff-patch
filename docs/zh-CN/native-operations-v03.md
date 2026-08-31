@@ -60,9 +60,10 @@ job 操作会独占创建同目录临时文件，完成写入、刷新与校验�
 
 ## 平台差异
 
-job API 仅用于 Android 与 iOS。React Native Web 应使用二进制 `diffBytes`、
-`patchBytes` API，并通过 `AbortSignal` 与字节限制控制任务；Web 调用 `startDiff`
-或 `startPatch` 会以 `EUNSUPPORTED` 拒绝。
+Android 与 iOS job 接收文件路径并返回 `0`；React Native Web job 接收二进制输入
+并返回 `Uint8Array`，也可以使用明确的 `startDiffBytes`、`startPatchBytes` 别名。
+Web 取消会终止当前 job 的专用 Worker 并以 `EABORTED` 拒绝，进度来自同一套 C 核心
+检查点。
 
 补丁格式仍是 `ENDSLEY/BSDIFF43`。0.3 改变的是操作控制，不是补丁兼容性。
 

@@ -57,6 +57,7 @@ try {
     path.join(repositoryDirectory, 'cpp', 'benchmark', 'native_benchmark.c'),
     path.join(repositoryDirectory, 'cpp', 'bsdiff.c'),
     path.join(repositoryDirectory, 'cpp', 'bspatch.c'),
+    path.join(repositoryDirectory, 'cpp', 'bspatch_streaming.c'),
     ...bzip2Sources,
     '-o',
     executable,

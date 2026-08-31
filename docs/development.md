@@ -34,6 +34,7 @@ yarn test:web
 yarn test:web:browser
 yarn test:web:metro
 yarn test:package
+yarn test:sdk
 ```
 
 - `test:web` checks the WebAssembly round trip and patch magic.
@@ -42,6 +43,9 @@ yarn test:package
   TurboModule facade.
 - `test:package` installs the real tarball into a clean consumer and verifies
   browser, ESM, CommonJS, TypeScript, and optional-peer behavior.
+- `test:sdk` installs the prepared tarball into an isolated Vite consumer and
+  verifies the explicit `/web` and `/toolkit` ESM entries, production resource
+  loading, and real byte round trips.
 
 ## Native robustness and compatibility
 
@@ -88,7 +92,7 @@ The large profile uses 16, 64, and 128 MiB fixtures and can consume several
 gigabytes of memory. It is intentionally not a pull-request gate. A manual
 `Native Core Benchmark` run accepts a comma-separated size list when a shared
 runner baseline is useful. Interpret the numbers with the scope and acceptance
-criteria in the [large-file roadmap](./large-files-v04.md).
+criteria in the [large-file roadmap](./large-files-roadmap.md).
 
 The published-package canaries install directly from npm and intentionally use
 current Vite and Expo toolchains. They are scheduled CI checks, not release
@@ -135,7 +139,11 @@ yarn test:web
 yarn test:web:browser
 ```
 
-Commit the regenerated `web/bsdiffpatch.mjs` with the C source change.
+Commit both generated modules with the C source change. The Node-compatible
+`web/bsdiffpatch.mjs` includes NODEFS for `/node` and the CLI; the dedicated
+browser `web/bsdiffpatch.browser.mjs` excludes Node runtime branches for the
+`/web` Worker graph. Do not replace one with the other to hide a bundler
+warning.
 
 ## Native verification
 
@@ -156,11 +164,14 @@ For local example commands, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 ## Publishing checklist
 
 1. Run the core, Web, and site gates.
-2. Run `yarn test:package` and inspect `npm pack --dry-run --ignore-scripts`.
+2. Run `yarn test:package`, `yarn test:sdk`, and inspect `npm pack --dry-run`.
+   The pack command runs the `prepack` contract check; use
+   `node scripts/check-package-contract.mjs` for a direct check.
 3. Confirm public docs match the exported TypeScript declarations.
 4. Confirm English and Chinese public guides describe the same behavior.
-5. Use `yarn release` to create the version, tag, and GitHub Release. It does not
-   publish directly to npm.
+5. When the prepared `package.json` version is final, use
+   `yarn release --no-increment` to create the release commit, tag, and GitHub
+   Release. Run it only with explicit maintainer authorization.
 6. Publishing the GitHub Release starts `npm-publish.yml`. The workflow checks
    that the tag matches `package.json`, runs the release gates, publishes through
    npm Trusted Publishing, and verifies the provenance attestation.

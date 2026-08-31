@@ -17,7 +17,7 @@ React Native Web
   -> typed public API
   -> shared or cancellation-scoped module Web Worker
   -> Emscripten MEMFS
-  -> the same bsdiff + bzip2 C sources compiled to WebAssembly
+  -> the same bsdiff + bzip2 C sources compiled to browser WebAssembly
 ```
 
 The worker boundaries keep expensive binary work away from the JavaScript/UI
@@ -45,9 +45,10 @@ Patches begin with a 24-byte header:
 | `16..23` | Signed 64-bit target size in the format's byte order |
 | `24..`   | bzip2-compressed control, diff, and extra data       |
 
-The Web adapter validates the header and signature before entering the C patch
-function. Native and Web operations use the same checked-in bsdiff and bzip2
-sources, preserving cross-platform patch compatibility.
+The Web adapter validates the header magic and declared target size before
+entering the C patch function. Native and Web operations use the same
+checked-in bsdiff and bzip2 sources, preserving cross-platform patch
+compatibility.
 
 The format identifies the patch implementation, but not the intended baseline
 or release. Applications should carry baseline and target digests in a trusted
@@ -55,16 +56,17 @@ manifest when distributing patches.
 
 ## WebAssembly packaging
 
-`scripts/build-web-wasm.sh` invokes Emscripten with:
+`scripts/build-web-wasm.sh` invokes Emscripten twice with the same C sources:
 
-- an ES module factory;
-- a single-file embedded WebAssembly payload;
-- memory growth enabled;
-- MEMFS and the `FS`/`ccall` runtime methods;
-- exported `bsDiffFile` and `bsPatchFile` functions.
+- `web/bsdiffpatch.mjs`: Node-compatible ES module factory with NODEFS for the
+  `/node` entry and CLI;
+- `web/bsdiffpatch.browser.mjs`: Node-free browser/Worker ES module factory;
+- both builds use a single-file embedded WebAssembly payload, memory growth,
+  MEMFS, the `FS`/`ccall` runtime methods, and the patch operation exports.
 
-The generated `web/bsdiffpatch.mjs` is published with the package. Consumers do
-not need Emscripten.
+Both generated modules are published with the package. The `/web` resource
+graph reaches only the browser module, while `/node` retains the Node module;
+consumers do not need Emscripten.
 
 ## Compatibility verification
 
@@ -113,9 +115,10 @@ runner family. The checked-in record is
 ## Memory model
 
 Native operations read the old and target files into process memory. Web calls
-copy inputs before transferring them to a Worker, then copy results out of
-MEMFS. Peak memory can therefore be several times larger than the input or
-output size. The native reference reaches roughly nineteen times the input size
+copy ArrayBuffer and typed-array inputs into Worker MEMFS; Blob and File inputs
+use a read-only WORKERFS mount. Results are copied out of MEMFS. Peak memory can
+therefore be several times larger than the input or output size. The native
+reference reaches roughly nineteen times the input size
 for this highly similar 50 MiB fixture, primarily because of the suffix array
 and simultaneous file buffers.
 

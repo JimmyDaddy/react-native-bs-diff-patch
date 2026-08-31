@@ -108,8 +108,13 @@ jobs:
                   quality=true
                   site=true
                   ;;
-                scripts/prepare-package.mjs|scripts/test-package-consumers.mjs)
+                scripts/prepare-package.mjs|scripts/check-package-contract.mjs|scripts/test-package-consumers.mjs|scripts/test-sdk-consumers.mjs|scripts/sdk-consumer/**|examples/web-sdk/**)
                   quality=true
+                  web=true
+                  ;;
+                bin/**|node/**|toolkit/**|action/**|action.yml|scripts/test-node-cli.mjs|scripts/test-toolkit.mjs|scripts/test-action.mjs)
+                  quality=true
+                  site=true
                   web=true
                   ;;
                 benchmarks/**|scripts/benchmark-web.mjs)
@@ -451,7 +456,11 @@ jobs:
           yarn test:web
           yarn test:web:browser
           yarn test:web:metro
+          yarn test:toolkit
+          yarn test:node
+          yarn test:action
           yarn test:package
+          yarn test:sdk
 
       - name: Verify npm package contents
         run: npm pack --dry-run --ignore-scripts

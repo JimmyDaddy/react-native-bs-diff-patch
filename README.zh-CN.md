@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <strong>比较文件的两个版本，生成紧凑的二进制补丁；再用旧文件和补丁还原新文件。</strong><br />
-  React Native Android、iOS 与 Web 共用同一种兼容格式。
+  <strong>面向 React Native、Web、Node.js 与发布 CI 的可验证二进制增量工具链。</strong><br />
+  用同一种兼容格式生成紧凑补丁、验证还原字节，并规划多基线分发。
 </p>
 
 <p align="center">
@@ -22,6 +22,7 @@
   <a href="https://bs-dff-patch.corerobin.com/docs/zh-CN/">中文文档</a> ·
   <a href="https://bs-dff-patch.corerobin.com/#playground">在线 Playground</a> ·
   <a href="https://bs-dff-patch.corerobin.com/zh-CN/tools/">二进制补丁工具箱</a> ·
+  <a href="https://bs-dff-patch.corerobin.com/zh-CN/planner/">发布规划器</a> ·
   <a href="./README.md">English</a> ·
   <a href="https://www.npmjs.com/package/react-native-bs-diff-patch">npm</a>
 </p>
@@ -49,6 +50,8 @@
   暴露未完成的输出文件。
 - **Web 无需补丁服务：** 差分和还原完全在浏览器本地执行。
 - **检查并证明兼容性：** 原生与 Web 使用相同 API 读取补丁元数据，并验证还原字节。
+- **发布端工具：** 通过 `npx` 生成补丁、发布可验证 manifest，并为每个基线选择
+  补丁或完整文件回退。
 
 ## 平台概览
 
@@ -56,15 +59,43 @@
 | -------- | ----------------------------------------- | ----------------------------------------------- |
 | 输入     | 绝对文件路径                              | `ArrayBuffer`、TypedArray、`DataView` 或 `Blob` |
 | 基础 API | `diff()` / `patch()`                      | `diffBytes()` / `patchBytes()`                  |
-| 可控 API | `startDiff()` / `startPatch()`            | `AbortSignal` 与二进制大小限制                  |
+| 可控 API | `startDiff()` / `startPatch()`            | 二进制 `startDiff()` / `startPatch()` job       |
 | 验证能力 | 路径版 `inspectPatch()` / `verifyPatch()` | 相同 API 的二进制输入                           |
 | 执行核心 | JNI / ObjC++ 调用原生 C                   | WASM Worker 运行同一 C 核心                     |
+
+## 发布端 CLI 与 bundle
+
+同一个 npm 包提供面向发布流程的 Node.js CLI：
+
+```sh
+npx react-native-bs-diff-patch diff old.bin new.bin -o update.patch
+npx react-native-bs-diff-patch verify old.bin update.patch new.bin
+npx react-native-bs-diff-patch bundle \
+  --from releases/ \
+  --to dist/app.bin \
+  --out dist/update-bundle
+```
+
+`bundle` 会评估每个基线，保留高收益补丁，增加完整文件回退，并写出适合 CDN
+选择和 detached signature 的 canonical manifest。CLI 通过 NODEFS 挂载宿主路径，
+验证 patch 时使用有界流式核心。也可以直接在浏览器打开
+[发布规划器](https://bs-dff-patch.corerobin.com/zh-CN/planner/)体验完整流程。
 
 ## 安装
 
 ```sh
-npm install react-native-bs-diff-patch
+npm install react-native-bs-diff-patch@^0.5.0
 ```
+
+明确的 `/web` 与 `/toolkit` 入口属于 0.5.0。发布前验证本地准备的包时，也可以改用其
+tarball：
+
+```sh
+npm install ./react-native-bs-diff-patch-0.5.0.tgz
+```
+
+registry 的 0.4.x 包尚未包含这些子路径。资源图和消费者检查详见
+[Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md)。
 
 iOS 还需要安装 Pods，并重新构建原生应用：
 
@@ -119,23 +150,33 @@ try {
 
 ## Web：第一次往返
 
+独立浏览器、Vite 和 Tauri 消费者应导入明确的
+`react-native-bs-diff-patch/web` ESM 入口；它提供字节 API，不需要 React Native。
+根包继续为已有应用保留 React Native 与 browser 条件解析。发布资源图和 CSP 见
+[Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md)。
+
 ```ts
-import { diffBytes, patchBytes } from 'react-native-bs-diff-patch';
+import { diffBytes, patchBytes } from 'react-native-bs-diff-patch/web';
 
-const oldBytes = await oldFile.arrayBuffer();
-const newBytes = await newFile.arrayBuffer();
-
-const patchBytesValue = await diffBytes(oldBytes, newBytes, {
+const patchBytesValue = await diffBytes(oldFile, newFile, {
   signal: abortController.signal,
   maxInputBytes: 64 * 1024 * 1024,
+  onProgress: ({ phase, progress }) => {
+    renderProgress(phase, progress);
+  },
 });
-const restoredBytes = await patchBytes(oldBytes, patchBytesValue, {
+const restoredBytes = await patchBytes(oldFile, patchBytesValue, {
   maxOutputBytes: 64 * 1024 * 1024,
 });
 ```
 
 Web API 返回新的 `Uint8Array`，不会转移或失效调用方的缓冲区。主动取消以
-`EABORTED` 拒绝；命中二进制大小限制时以 `ERESOURCE` 拒绝。
+`EABORTED` 拒绝；命中二进制大小限制时以 `ERESOURCE` 拒绝。`Blob` 与 `File`
+会只读挂载到 Worker，不需要先在主线程生成完整副本。
+
+Web 端可以用二进制输入调用 `startDiff()` / `startPatch()`，也可以使用明确的
+`startDiffBytes()` / `startPatchBytes()` 别名，获得带 `result`、`cancel()` 和
+真实 C 核心进度事件的 job。
 
 ## 检查并验证补丁
 
@@ -163,17 +204,18 @@ if (!metadata.valid || !result.verified) {
 
 ## API 矩阵
 
-| API                                           | Android | iOS    | Web    |
-| --------------------------------------------- | ------- | ------ | ------ |
-| `diff(oldPath, newPath, patchPath)`           | 支持    | 支持   | 不支持 |
-| `patch(oldPath, outputPath, patchPath)`       | 支持    | 支持   | 不支持 |
-| `startDiff(...)` / `startPatch(...)`          | 支持    | 支持   | 不支持 |
-| `diffBytes(oldData, newData, options?)`       | 不支持  | 不支持 | 支持   |
-| `patchBytes(oldData, patchData, options?)`    | 不支持  | 不支持 | 支持   |
-| `inspectPatch(path 或 binary, options?)`      | 支持    | 支持   | 支持   |
-| `verifyPatch(old, patch, expected, options?)` | 支持    | 支持   | 支持   |
-| 旧架构（限 RN 仍提供时）                      | 支持    | 支持   | 不适用 |
-| 新架构 / TurboModule                          | 支持    | 支持   | 不适用 |
+| API                                            | Android | iOS    | Web    |
+| ---------------------------------------------- | ------- | ------ | ------ |
+| `diff(oldPath, newPath, patchPath)`            | 支持    | 支持   | 不支持 |
+| `patch(oldPath, outputPath, patchPath)`        | 支持    | 支持   | 不支持 |
+| `startDiff(...)` / `startPatch(...)`           | 路径    | 路径   | 二进制 |
+| `startDiffBytes(...)` / `startPatchBytes(...)` | 不支持  | 不支持 | 支持   |
+| `diffBytes(oldData, newData, options?)`        | 不支持  | 不支持 | 支持   |
+| `patchBytes(oldData, patchData, options?)`     | 不支持  | 不支持 | 支持   |
+| `inspectPatch(path 或 binary, options?)`       | 支持    | 支持   | 支持   |
+| `verifyPatch(old, patch, expected, options?)`  | 支持    | 支持   | 支持   |
+| 旧架构（限 RN 仍提供时）                       | 支持    | 支持   | 不适用 |
+| 新架构 / TurboModule                           | 支持    | 支持   | 不适用 |
 
 调用当前平台不可用的 API 会以 `EUNSUPPORTED` 拒绝，不会静默切换成其他输入
 模型。
@@ -184,26 +226,31 @@ if (!metadata.valid || !result.verified) {
 - 替换业务数据前，验证还原结果与目标文件完全一致。
 - 原生端使用唯一输出路径，并清理不再需要的输出文件。
 - 按业务设置资源限制；二进制差分的峰值内存可能达到输入大小的数倍。
-- 使用本库配套生成和应用补丁；通用 `BSDIFF40` 与
-  `ENDSLEY/BSDIFF43` 不兼容。
+- 运行时只接受 `ENDSLEY/BSDIFF43`。已有 `BSDIFF40` 可以通过
+  `npx react-native-bs-diff-patch convert legacy.patch -o compatible.patch`
+  离线转换，并在发布前完成验证。
 
 完整性校验、补丁下载、跨运行时交换、错误处理与清理模式见
 [生产实践](./docs/zh-CN/recipes.md)。
 
 ## 已验证的兼容性
 
-CI 会使用 React Native 0.73.11、0.74.7 与 0.86.0 编译 Android 和 iOS API，
-并在 Android 与 iOS 上执行新架构设备级断言。真实 npm 包消费测试还覆盖 browser、
-ESM、CommonJS、Metro 与 TypeScript 解析。
+CI 覆盖使用 React Native 0.73.11、0.74.7 与 0.86.0 的 Android 和 iOS API 构建，
+并运行配置的新架构断言。这些检查不等同于 Tauri WebView 验收或下游真机验收。真实
+npm 包消费测试还覆盖 browser、ESM、CommonJS、Metro 与 TypeScript 解析。
 
 ## 完整文档
 
+- [Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md) — 从 Vite 或 Tauri 使用明确的
+  `/web` 与 `/toolkit` ESM 入口，无需 React Native 或 Node sidecar。
 - [快速开始](./docs/zh-CN/getting-started.md)
 - [API 参考](./docs/zh-CN/api-reference.md)
 - [生产实践](./docs/zh-CN/recipes.md)
+- [可验证增量发布工具链](./docs/zh-CN/verified-delta-pipeline.md)
 - [平台支持](./docs/zh-CN/platform-support.md)
 - [架构与补丁格式](./docs/zh-CN/architecture.md)
 - [可控制的原生操作](./docs/zh-CN/native-operations-v03.md)
+- [大文件演进路线](./docs/zh-CN/large-files-roadmap.md)
 - [常见问题与排障](./docs/zh-CN/troubleshooting.md)
 - [开发与验证](./docs/zh-CN/development.md)
 

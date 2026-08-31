@@ -26,6 +26,7 @@ if "$compiler" \
   -fsanitize=fuzzer,address,undefined \
   -I"$repository_directory/cpp" \
   "$repository_directory/cpp/bspatch.c" \
+  "$repository_directory/cpp/bspatch_streaming.c" \
   "$repository_directory/cpp/fuzz/bspatch_fuzzer.c" \
   "$repository_directory/cpp/bzlib/blocksort.c" \
   "$repository_directory/cpp/bzlib/bzlib.c" \
@@ -50,6 +51,7 @@ else
     -fsanitize=address,undefined \
     -I"$repository_directory/cpp" \
     "$repository_directory/cpp/bspatch.c" \
+    "$repository_directory/cpp/bspatch_streaming.c" \
     "$repository_directory/cpp/fuzz/bspatch_fuzzer.c" \
     "$repository_directory/cpp/bzlib/blocksort.c" \
     "$repository_directory/cpp/bzlib/bzlib.c" \

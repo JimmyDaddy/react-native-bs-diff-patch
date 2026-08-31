@@ -16,7 +16,9 @@ cc -std=c11 "$feature_test_macro" -O2 -Wall -Wextra -Werror \
   -I "$repository_directory/cpp" \
   "$repository_directory/cpp/tests/native_operations_test.c" \
   "$repository_directory/cpp/bsdiff.c" \
+  "$repository_directory/cpp/bsdiff40_converter.c" \
   "$repository_directory/cpp/bspatch.c" \
+  "$repository_directory/cpp/bspatch_streaming.c" \
   "$repository_directory/cpp/bzlib/blocksort.c" \
   "$repository_directory/cpp/bzlib/bzlib.c" \
   "$repository_directory/cpp/bzlib/compress.c" \

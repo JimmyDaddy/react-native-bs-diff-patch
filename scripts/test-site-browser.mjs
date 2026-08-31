@@ -228,8 +228,8 @@ try {
   const generatedManifest = JSON.parse(
     await page.$eval('#manifest-output', (element) => element.textContent || '')
   );
-  assert.equal(generatedManifest.manifestVersion, 1);
-  assert.equal(generatedManifest.patchFormat, 'ENDSLEY/BSDIFF43');
+  assert.equal(generatedManifest.version, 1);
+  assert.equal(generatedManifest.format, 'ENDSLEY/BSDIFF43');
   assert.equal(generatedManifest.target.bytes, fixtures.newBytes.length);
   assert.equal(generatedManifest.target.sha256.length, 64);
   assert.equal(generatedManifest.patch.sha256.length, 64);
@@ -297,6 +297,101 @@ try {
       element.textContent.trim()
     ),
     'English'
+  );
+
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  await page.goto(`${baseUrl}/planner/`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#planner-runtime-state[data-state="ready"]');
+  const plannerFixtures = {
+    baselineOne: [...new TextEncoder().encode('A'.repeat(8192))],
+    baselineTwo: [...new TextEncoder().encode(`${'A'.repeat(8190)}CC`)],
+    target: [...new TextEncoder().encode(`${'A'.repeat(8191)}B`)],
+  };
+  await selectFile(
+    '#planner-target-file',
+    plannerFixtures.target,
+    'release-v3.bin'
+  );
+  await page.evaluate(
+    ({ first, second }) => {
+      const input = document.querySelector('#planner-baseline-files');
+      const transfer = new DataTransfer();
+      transfer.items.add(
+        new File([new Uint8Array(first)], 'release-<img src=x>.bin', {
+          type: 'application/octet-stream',
+        })
+      );
+      transfer.items.add(
+        new File([new Uint8Array(second)], 'release-v2.bin', {
+          type: 'application/octet-stream',
+        })
+      );
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    {
+      first: plannerFixtures.baselineOne,
+      second: plannerFixtures.baselineTwo,
+    }
+  );
+  await page.click('#planner-run');
+  await page.waitForSelector('#planner-status[data-state="success"]', {
+    timeout: 30_000,
+  });
+  assert.equal(
+    await page.$eval(
+      '#planner-baseline-count',
+      (element) => element.textContent
+    ),
+    '2'
+  );
+  assert.equal(
+    await page.$eval('#planner-patch-count', (element) => element.textContent),
+    '2'
+  );
+  assert.equal(
+    await page.$$eval('#planner-matrix tr', (rows) => rows.length),
+    2
+  );
+  assert.equal(
+    await page.$eval(
+      '#planner-matrix tr:first-child strong',
+      (element) => element.textContent
+    ),
+    'release-<img src=x>.bin'
+  );
+  assert.equal(
+    await page.$$eval('#planner-matrix img', (images) => images.length),
+    0
+  );
+  assert.equal(
+    await page.$eval(
+      '#planner-download-manifest',
+      (element) => element.disabled
+    ),
+    false
+  );
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.reload({ waitUntil: 'networkidle0' });
+  const plannerMobile = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  assert.ok(
+    plannerMobile.scrollWidth <= plannerMobile.clientWidth + 1,
+    `planner mobile layout overflows by ${
+      plannerMobile.scrollWidth - plannerMobile.clientWidth
+    }px`
+  );
+
+  await page.goto(`${baseUrl}/zh-CN/planner/`, {
+    waitUntil: 'networkidle0',
+  });
+  assert.equal(await page.$eval('html', (element) => element.lang), 'zh-CN');
+  assert.match(
+    await page.$eval('h1', (element) => element.textContent || ''),
+    /规划一次发布/
   );
 
   await page.goto(`${baseUrl}/docs/api-reference/`, {

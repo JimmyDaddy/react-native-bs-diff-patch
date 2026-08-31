@@ -4,6 +4,22 @@ export interface BinaryOperationOptions {
   signal?: AbortSignal;
   maxInputBytes?: number;
   maxOutputBytes?: number;
+  onProgress?: (event: BinaryOperationProgress) => void;
+}
+
+export interface BinaryOperationProgress {
+  operation: 'diff' | 'patch';
+  phase: 'reading' | 'processing' | 'writing';
+  progress: number;
+}
+
+export interface BinaryOperationJob {
+  id: string;
+  result: Promise<Uint8Array>;
+  cancel(): Promise<void>;
+  onProgress(
+    listener: (event: BinaryOperationProgress & { id: string }) => void
+  ): () => void;
 }
 
 export interface NativeOperationOptions {
@@ -54,6 +70,25 @@ export interface PatchVerificationResult {
   patch: PatchMetadata;
 }
 
+export type PatchErrorCategory =
+  | 'ABORTED'
+  | 'RESOURCE'
+  | 'INVALID_ARGUMENT'
+  | 'INVALID_PATCH'
+  | 'VERIFICATION'
+  | 'DESTINATION'
+  | 'UNSUPPORTED'
+  | 'RUNTIME';
+
+export interface ClassifiedPatchError {
+  category: PatchErrorCategory;
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+export function classifyPatchError(error: unknown): ClassifiedPatchError;
+
 export function diff(
   oldFile: string,
   newFile: string,
@@ -91,15 +126,25 @@ export function verifyPatch(
 ): Promise<PatchVerificationResult>;
 
 export function startDiff(
-  oldFile: string,
-  newFile: string,
-  patchFile: string,
-  options?: NativeOperationOptions
-): NativeOperationJob;
+  oldData: BinaryInput,
+  newData: BinaryInput,
+  options?: BinaryOperationOptions
+): BinaryOperationJob;
 
 export function startPatch(
-  oldFile: string,
-  newFile: string,
-  patchFile: string,
-  options?: NativeOperationOptions
-): NativeOperationJob;
+  oldData: BinaryInput,
+  patchData: BinaryInput,
+  options?: BinaryOperationOptions
+): BinaryOperationJob;
+
+export function startDiffBytes(
+  oldData: BinaryInput,
+  newData: BinaryInput,
+  options?: BinaryOperationOptions
+): BinaryOperationJob;
+
+export function startPatchBytes(
+  oldData: BinaryInput,
+  patchData: BinaryInput,
+  options?: BinaryOperationOptions
+): BinaryOperationJob;

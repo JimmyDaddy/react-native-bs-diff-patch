@@ -51,6 +51,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
   input.data = data + 2 + copied_old_size;
   input.size = size - 2 - copied_old_size;
   input.offset = 0;
+  memset(&stream, 0, sizeof(stream));
   stream.opaque = &input;
   stream.read = fuzz_read;
 

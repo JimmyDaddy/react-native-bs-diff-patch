@@ -16,7 +16,7 @@ React Native Web
   -> 强类型公开 API
   -> 共享或取消任务专用的模块 Web Worker
   -> Emscripten MEMFS
-  -> 由同一套 bsdiff + bzip2 C 源码编译的 WebAssembly
+  -> 由同一套 bsdiff + bzip2 C 源码编译的浏览器 WebAssembly
 ```
 
 Worker 边界让高开销二进制计算离开 JavaScript / UI 线程，但不会消除算法成本。
@@ -40,23 +40,24 @@ MEMFS 临时文件。
 | `16..23` | 该格式字节序下的有符号 64 位目标大小 |
 | `24..`   | bzip2 压缩的控制、差分和附加数据     |
 
-Web 适配器进入 C patch 函数前会校验头和签名。原生与 Web 使用同一份已检入的
-bsdiff 和 bzip2 源码，从而保持跨平台兼容。
+Web 适配器进入 C patch 函数前会校验头部 magic 与声明的目标大小。原生与 Web 使用同一份
+已检入的 bsdiff 和 bzip2 源码，从而保持跨平台兼容。
 
 格式能标识补丁实现，但不标识预期基线或发布版本。分发补丁时，应用应在可信清单中
 携带基线和目标摘要。
 
 ## WebAssembly 打包
 
-`scripts/build-web-wasm.sh` 使用 Emscripten 生成：
+`scripts/build-web-wasm.sh` 使用同一套 C 源码调用 Emscripten 两次，生成：
 
-- ES module 工厂；
-- 单文件内嵌 WebAssembly payload；
-- 可增长内存；
-- MEMFS 以及 `FS` / `ccall` 运行时方法；
-- 导出的 `bsDiffFile` 和 `bsPatchFile` 函数。
+- `web/bsdiffpatch.mjs`：带 NODEFS 的 Node 兼容 ES module 工厂，供 `/node` 入口和
+  CLI 使用；
+- `web/bsdiffpatch.browser.mjs`：不包含 Node 分支的浏览器/Worker ES module 工厂；
+- 两者都使用单文件内嵌 WebAssembly payload、可增长内存、MEMFS、`FS` / `ccall`
+  运行时方法和补丁操作导出。
 
-生成的 `web/bsdiffpatch.mjs` 随 npm 包发布，消费者无需安装 Emscripten。
+两个生成模块都会随 npm 包发布。`/web` 资源图只会到达浏览器模块，`/node` 保留
+Node 模块；消费者无需安装 Emscripten。
 
 ## 兼容性验证
 
@@ -98,8 +99,9 @@ bsdiff 和 bzip2 源码，从而保持跨平台兼容。
 
 ## 内存模型
 
-原生操作会把旧文件与目标文件读入进程内存。Web 调用先复制输入再传给 Worker，
-之后从 MEMFS 复制结果，因此峰值内存可能达到输入或输出大小的数倍。在这组高度相似
+原生操作会把旧文件与目标文件读入进程内存。Web 的 ArrayBuffer 和 TypedArray 输入会
+复制到 Worker 的 MEMFS；Blob 与 File 使用只读 WORKERFS 挂载；结果再从 MEMFS 复制出，
+因此峰值内存可能达到输入或输出大小的数倍。在这组高度相似
 的 50 MiB fixture 中，原生参考峰值约为输入的十九倍，主要来自后缀数组和同时存在的
 文件缓冲区。
 

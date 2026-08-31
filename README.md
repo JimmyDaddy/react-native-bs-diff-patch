@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <strong>Turn two versions of a file into a compact binary patch, then reconstruct the new file from the old file plus that patch.</strong><br />
-  One compatible format across React Native Android, iOS, and Web.
+  <strong>A verified binary delta pipeline for React Native, Web, Node.js, and release CI.</strong><br />
+  Create compact patches, prove restored bytes, and plan multi-baseline delivery with one compatible format.
 </p>
 
 <p align="center">
@@ -22,6 +22,7 @@
   <a href="https://bs-dff-patch.corerobin.com/docs/">Documentation</a> ·
   <a href="https://bs-dff-patch.corerobin.com/#playground">Live Playground</a> ·
   <a href="https://bs-dff-patch.corerobin.com/tools/">Binary Patch Toolkit</a> ·
+  <a href="https://bs-dff-patch.corerobin.com/planner/">Release Planner</a> ·
   <a href="./README.zh-CN.md">中文说明</a> ·
   <a href="https://www.npmjs.com/package/react-native-bs-diff-patch">npm</a>
 </p>
@@ -53,6 +54,8 @@ replaces live data.
   browser.
 - **Inspect and prove compatibility:** read patch metadata and verify restored
   bytes through the same API shape on native and Web.
+- **Release-side tooling:** generate patches through `npx`, publish verified
+  manifests, and choose a patch or full-file fallback for each baseline.
 
 ## Platform overview
 
@@ -60,15 +63,45 @@ replaces live data.
 | -------------- | -------------------------------------------- | -------------------------------------------------- |
 | Input          | Absolute file paths                          | `ArrayBuffer`, typed arrays, `DataView`, or `Blob` |
 | Basic API      | `diff()` / `patch()`                         | `diffBytes()` / `patchBytes()`                     |
-| Controlled API | `startDiff()` / `startPatch()`               | `AbortSignal` and binary limits                    |
+| Controlled API | `startDiff()` / `startPatch()`               | Binary `startDiff()` / `startPatch()` jobs         |
 | Verification   | Paths via `inspectPatch()` / `verifyPatch()` | Binary values via the same APIs                    |
 | Engine         | Native C via JNI / ObjC++                    | Same C core via WASM Worker                        |
+
+## Release-side CLI and bundles
+
+The same npm package includes a Node.js CLI for release pipelines:
+
+```sh
+npx react-native-bs-diff-patch diff old.bin new.bin -o update.patch
+npx react-native-bs-diff-patch verify old.bin update.patch new.bin
+npx react-native-bs-diff-patch bundle \
+  --from releases/ \
+  --to dist/app.bin \
+  --out dist/update-bundle
+```
+
+`bundle` evaluates every baseline, retains efficient patches, adds a full-file
+fallback, and writes a canonical verified manifest suitable for CDN selection
+and detached signing. The CLI mounts host paths through NODEFS, while verified
+patch application uses the bounded streaming core. Try the workflow in the browser with the
+[Release Planner](https://bs-dff-patch.corerobin.com/planner/).
 
 ## Install
 
 ```sh
-npm install react-native-bs-diff-patch
+npm install react-native-bs-diff-patch@^0.5.0
 ```
+
+The explicit `/web` and `/toolkit` entries are part of 0.5.0. For pre-release
+verification of a locally prepared package, the same entries can be tested from
+its tarball instead:
+
+```sh
+npm install ./react-native-bs-diff-patch-0.5.0.tgz
+```
+
+The registry's 0.4.x package predates these subpaths. See the [Web and desktop
+WebView SDK guide](./docs/web-sdk.md) for the resource graph and consumer checks.
 
 For iOS, install Pods and rebuild the native application:
 
@@ -123,24 +156,35 @@ try {
 
 ## Web: first round trip
 
+Standalone browser, Vite, and Tauri consumers should import the explicit ESM
+entry `react-native-bs-diff-patch/web`; it exposes byte APIs and does not
+require React Native. The root package keeps its conditional React Native and
+browser resolution for existing applications. See the [Web and desktop WebView
+SDK guide](./docs/web-sdk.md) for the published resource graph and CSP.
+
 ```ts
-import { diffBytes, patchBytes } from 'react-native-bs-diff-patch';
+import { diffBytes, patchBytes } from 'react-native-bs-diff-patch/web';
 
-const oldBytes = await oldFile.arrayBuffer();
-const newBytes = await newFile.arrayBuffer();
-
-const patchBytesValue = await diffBytes(oldBytes, newBytes, {
+const patchBytesValue = await diffBytes(oldFile, newFile, {
   signal: abortController.signal,
   maxInputBytes: 64 * 1024 * 1024,
+  onProgress: ({ phase, progress }) => {
+    renderProgress(phase, progress);
+  },
 });
-const restoredBytes = await patchBytes(oldBytes, patchBytesValue, {
+const restoredBytes = await patchBytes(oldFile, patchBytesValue, {
   maxOutputBytes: 64 * 1024 * 1024,
 });
 ```
 
 Web calls return a new `Uint8Array` and leave caller-owned buffers usable.
 Aborted operations reject with `EABORTED`; configured binary limits reject with
-`ERESOURCE`.
+`ERESOURCE`. `Blob` and `File` inputs are mounted read-only in the Worker, so
+they do not need a full main-thread copy before the C core reads them.
+
+Use `startDiff()` / `startPatch()` with binary inputs on Web, or the explicit
+`startDiffBytes()` / `startPatchBytes()` aliases, when UI code needs a job
+object with `result`, `cancel()`, and real C-core progress events.
 
 ## Inspect and verify a patch
 
@@ -169,17 +213,18 @@ update manifest before replacing live data.
 
 ## API matrix
 
-| API                                           | Android | iOS | Web |
-| --------------------------------------------- | ------- | --- | --- |
-| `diff(oldPath, newPath, patchPath)`           | Yes     | Yes | No  |
-| `patch(oldPath, outputPath, patchPath)`       | Yes     | Yes | No  |
-| `startDiff(...)` / `startPatch(...)`          | Yes     | Yes | No  |
-| `diffBytes(oldData, newData, options?)`       | No      | No  | Yes |
-| `patchBytes(oldData, patchData, options?)`    | No      | No  | Yes |
-| `inspectPatch(path or binary, options?)`      | Yes     | Yes | Yes |
-| `verifyPatch(old, patch, expected, options?)` | Yes     | Yes | Yes |
-| Legacy architecture, while supplied by RN     | Yes     | Yes | N/A |
-| New Architecture / TurboModule                | Yes     | Yes | N/A |
+| API                                            | Android | iOS   | Web    |
+| ---------------------------------------------- | ------- | ----- | ------ |
+| `diff(oldPath, newPath, patchPath)`            | Yes     | Yes   | No     |
+| `patch(oldPath, outputPath, patchPath)`        | Yes     | Yes   | No     |
+| `startDiff(...)` / `startPatch(...)`           | Paths   | Paths | Binary |
+| `startDiffBytes(...)` / `startPatchBytes(...)` | No      | No    | Yes    |
+| `diffBytes(oldData, newData, options?)`        | No      | No    | Yes    |
+| `patchBytes(oldData, patchData, options?)`     | No      | No    | Yes    |
+| `inspectPatch(path or binary, options?)`       | Yes     | Yes   | Yes    |
+| `verifyPatch(old, patch, expected, options?)`  | Yes     | Yes   | Yes    |
+| Legacy architecture, while supplied by RN      | Yes     | Yes   | N/A    |
+| New Architecture / TurboModule                 | Yes     | Yes   | N/A    |
 
 Unavailable platform APIs reject with `EUNSUPPORTED`; the package never
 silently switches to a different input model.
@@ -191,27 +236,34 @@ silently switches to a different input model.
 - Use unique native output paths and remove outputs you no longer need.
 - Set product-specific resource limits. Binary diffing can use several times
   the input size in peak memory.
-- Generate and apply patches with this library. Generic `BSDIFF40` patches are
-  not interchangeable with `ENDSLEY/BSDIFF43` patches.
+- Runtime APIs accept `ENDSLEY/BSDIFF43`. Convert existing `BSDIFF40` files
+  offline with `npx react-native-bs-diff-patch convert legacy.patch -o
+compatible.patch`, then verify them before publishing.
 
 See [Production recipes](./docs/recipes.md) for integrity checks, downloads,
 cross-runtime exchange, error handling, and cleanup patterns.
 
 ## Verified compatibility
 
-CI compiles the Android and iOS APIs against React Native 0.73.11, 0.74.7, and
-0.86.0, and runs device-level New Architecture assertions on Android and iOS.
-Packed-consumer tests verify browser, ESM, CommonJS, Metro, and TypeScript
-resolution from the real npm package shape.
+CI covers Android and iOS API builds against React Native 0.73.11, 0.74.7, and
+0.86.0, and runs the configured New Architecture assertions. These checks do
+not constitute Tauri WebView acceptance or downstream physical-device
+acceptance. Packed-consumer tests verify browser, ESM, CommonJS, Metro, and
+TypeScript resolution from the real npm package shape.
 
 ## Documentation
 
+- [Web and desktop WebView SDK](./docs/web-sdk.md) — use the explicit ESM
+  `/web` and `/toolkit` entries from Vite or Tauri without React Native or a
+  Node sidecar.
 - [Getting started](./docs/getting-started.md)
 - [API reference](./docs/api-reference.md)
 - [Production recipes](./docs/recipes.md)
+- [Verified Delta Pipeline](./docs/verified-delta-pipeline.md)
 - [Platform support](./docs/platform-support.md)
 - [Architecture and patch format](./docs/architecture.md)
 - [Controllable native operations](./docs/native-operations-v03.md)
+- [Large-file roadmap](./docs/large-files-roadmap.md)
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Development and verification](./docs/development.md)
 

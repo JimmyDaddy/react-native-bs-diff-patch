@@ -19,6 +19,10 @@ React Native autolinking handles Android and iOS registration. Rebuild the
 native application after installation; reloading Metro does not change the
 native modules inside an already-installed binary.
 
+For a Vite app or desktop WebView, use the dedicated [Web and desktop WebView
+SDK](./web-sdk.md) guide. It uses the explicit ESM `/web` entry and does not
+require React Native or a Node sidecar.
+
 ## Choose the API for the runtime
 
 | Runtime      | Use                          | Do not use       |

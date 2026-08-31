@@ -25,5 +25,5 @@ On the recorded Apple M3 Pro baseline, native completed all three large sizes.
 Web completed 16 and 64 MiB, but its 128 MiB diff returned `EWEBASSEMBLY` after
 reaching the current WebAssembly memory boundary. The failed sample is retained
 intentionally: it is a measured limitation, not a flaky result. See the
-[large-file roadmap](../docs/large-files-v04.md) before interpreting or changing
+[large-file roadmap](../docs/large-files-roadmap.md) before interpreting or changing
 these limits.

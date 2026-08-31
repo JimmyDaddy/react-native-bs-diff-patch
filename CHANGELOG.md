@@ -4,6 +4,51 @@ All notable changes to this project are documented in this file. Releases use
 [Semantic Versioning](https://semver.org/) and are generated from Conventional
 Commits by release-it.
 
+## [0.5.0](https://github.com/JimmyDaddy/react-native-bs-diff-patch/compare/v0.4.0...v0.5.0) (2026-08-31)
+
+### Added
+
+- add the explicit ESM `react-native-bs-diff-patch/web` entry for browser and
+  desktop WebView byte operations, including typed declarations, Worker jobs,
+  progress, cancellation, input/output limits, patch inspection, and
+  byte-for-byte verification;
+- publish a Node-free browser/Worker WebAssembly artifact alongside the
+  Node-compatible artifact, while keeping the existing root React Native,
+  Node, and CLI loading paths;
+- add the ESM `react-native-bs-diff-patch/toolkit` entry for normalized
+  manifests, multi-baseline bundles, canonical payloads, candidate selection,
+  error classification, and header-only inspection;
+- add tarball consumer checks for `/web` and `/toolkit`, production Vite
+  resource loading, offline browser execution, and TypeScript resolution;
+- add the Node release helpers, CLI, GitHub Action, and BSDIFF40 converter
+  needed to prepare verified release artifacts without changing the runtime's
+  `ENDSLEY/BSDIFF43` compatibility contract;
+- add bilingual WebView integration, packaging, lifecycle, CSP, resource
+  budget, trust-boundary, and release documentation.
+
+### Compatibility and release boundaries
+
+- keep the existing root CommonJS build, React Native conditional exports,
+  native path API, and Node-compatible `web/bsdiffpatch.mjs`;
+- keep `/web` and `/toolkit` ESM-only, and map the browser Worker graph to
+  `web/bsdiffpatch.browser.mjs` without a CDN or Node runtime fallback;
+- keep `BSDIFF40` as a header-inspection/conversion case only; runtime
+  generation and application remain `ENDSLEY/BSDIFF43`;
+- leave file authorization, persistence, and final replacement to downstream
+  desktop applications. Tauri WebView acceptance remains a downstream test,
+  and registry smoke checks remain a post-release validation step.
+
+### Security and compatibility scope
+
+- enforce a zero-byte output budget during C compressed output writes, and add
+  control-flow guards for malformed or non-progressing patch streams;
+- classify toolkit array cycles as `EINVALID_MANIFEST`, preserve a literal
+  `__proto__` object key during canonicalization, and reject invalid selection
+  budgets even when the requested baseline has no matching candidate;
+- retain first-match candidate selection rather than silently choosing the
+  smallest patch, while keeping the root React Native/Node compatibility paths
+  and the `ENDSLEY/BSDIFF43` runtime format unchanged.
+
 ## [0.4.0](https://github.com/JimmyDaddy/react-native-bs-diff-patch/compare/v0.3.0...v0.4.0) (2026-07-23)
 
 ### Features

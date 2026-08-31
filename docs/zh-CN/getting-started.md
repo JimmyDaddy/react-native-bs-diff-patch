@@ -17,6 +17,9 @@ npx pod-install
 React Native autolinking 会完成 Android 与 iOS 注册。安装后必须重新构建原生应用；
 刷新 Metro 不会改变已经安装的应用二进制中包含的原生模块。
 
+如果使用 Vite 应用或桌面 WebView，请阅读[Web 与桌面 WebView SDK](./web-sdk.md)。
+它使用明确的 `/web` ESM 入口，不需要 React Native 或 Node sidecar。
+
 ## 按运行时选择 API
 
 | 运行时       | 应使用                      | 不应使用       |

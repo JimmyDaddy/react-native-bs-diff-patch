@@ -17,6 +17,13 @@ const pages = [
     file: 'getting-started.md',
   },
   {
+    slug: 'web-sdk',
+    title: 'Web and desktop SDK',
+    description:
+      'Use public Web and toolkit exports in Vite and desktop WebViews without React Native or a Node sidecar.',
+    file: 'web-sdk.md',
+  },
+  {
     slug: 'api-reference',
     title: 'API reference',
     description:
@@ -29,6 +36,13 @@ const pages = [
     description:
       'Integrity checks, temporary files, downloads, resource limits, and cross-runtime workflows.',
     file: 'recipes.md',
+  },
+  {
+    slug: 'verified-delta-pipeline',
+    title: 'Verified Delta Pipeline',
+    description:
+      'Node CLI, verified manifests, multi-baseline bundles, release selection, and GitHub Actions.',
+    file: 'verified-delta-pipeline.md',
   },
   {
     slug: 'platform-support',
@@ -52,11 +66,11 @@ const pages = [
     file: 'native-operations-v03.md',
   },
   {
-    slug: 'large-files-v04',
+    slug: 'large-files-roadmap',
     title: 'Large-file roadmap',
     description:
       'Memory baselines, honest progress semantics, and streaming feasibility for larger inputs.',
-    file: 'large-files-v04.md',
+    file: 'large-files-roadmap.md',
   },
   {
     slug: 'troubleshooting',
@@ -82,6 +96,13 @@ const chinesePages = [
     file: 'getting-started.md',
   },
   {
+    slug: 'web-sdk',
+    title: 'Web 与桌面 SDK',
+    description:
+      '通过公开 Web 与 toolkit 入口接入 Vite 和桌面 WebView，无需 React Native 或 Node sidecar。',
+    file: 'web-sdk.md',
+  },
+  {
     slug: 'api-reference',
     title: 'API 参考',
     description: '函数签名、可接受输入、返回值、错误码和并发行为。',
@@ -92,6 +113,13 @@ const chinesePages = [
     title: '生产实践',
     description: '补丁完整性、临时文件、下载、资源限制和跨运行时流程。',
     file: 'recipes.md',
+  },
+  {
+    slug: 'verified-delta-pipeline',
+    title: '可验证增量发布工具链',
+    description:
+      'Node CLI、可验证 manifest、多基线 bundle、发布选择与 GitHub Actions。',
+    file: 'verified-delta-pipeline.md',
   },
   {
     slug: 'platform-support',
@@ -112,10 +140,10 @@ const chinesePages = [
     file: 'native-operations-v03.md',
   },
   {
-    slug: 'large-files-v04',
+    slug: 'large-files-roadmap',
     title: '大文件演进路线',
     description: '面向更大输入的内存基线、真实进度语义与流式处理可行性。',
-    file: 'large-files-v04.md',
+    file: 'large-files-roadmap.md',
   },
   {
     slug: 'troubleshooting',
@@ -314,6 +342,8 @@ const englishUi = {
   skipLabel: 'Skip to documentation',
   primaryNavigationLabel: 'Primary navigation',
   playgroundLabel: 'Playground',
+  plannerLabel: 'Release Planner',
+  plannerPath: '/planner/',
   toolsLabel: 'Tools',
   toolsPath: '/tools/',
   docsLabel: 'Docs',
@@ -340,6 +370,8 @@ const chineseUi = {
   skipLabel: '跳到文档正文',
   primaryNavigationLabel: '主导航',
   playgroundLabel: '在线实验',
+  plannerLabel: '发布规划',
+  plannerPath: '/zh-CN/planner/',
   toolsLabel: '工具',
   toolsPath: '/zh-CN/tools/',
   docsLabel: '中文文档',
@@ -419,6 +451,7 @@ function documentationLayout({ slug, title, description, content, items, ui }) {
       <nav class="nav-links" aria-label="${ui.primaryNavigationLabel}">
         <a href="${ui.homePath}#playground">${ui.playgroundLabel}</a>
         <a href="${ui.toolsPath}">${ui.toolsLabel}</a>
+        <a href="${ui.plannerPath}">${ui.plannerLabel}</a>
         <a href="${ui.basePath}/">${ui.docsLabel}</a>
         <a href="${alternate}" hreflang="${ui.alternateLanguage}">${
     ui.alternateLabel
@@ -452,8 +485,10 @@ function documentationLayout({ slug, title, description, content, items, ui }) {
       <p>${ui.footerText}</p>
       <nav aria-label="${ui.footerNavigationLabel}"><a href="${ui.homePath}">${
     ui.homeLabel
-  }</a><a href="${ui.toolsPath}">${
-    ui.toolsLabel
+  }</a><a href="${ui.toolsPath}">${ui.toolsLabel}</a><a href="${
+    ui.plannerPath
+  }">${
+    ui.plannerLabel
   }</a><a href="https://www.npmjs.com/package/react-native-bs-diff-patch">npm</a><a href="https://github.com/JimmyDaddy/react-native-bs-diff-patch">GitHub</a></nav>
     </footer>
     <script src="/assets/site.js" defer></script>
@@ -518,6 +553,7 @@ function localizeHomepage(source) {
     ['aria-label="Primary navigation"', 'aria-label="主导航"'],
     ['>Playground</a>', '>在线实验</a>'],
     ['>Tools</a>', '>工具</a>'],
+    ['>Release Planner</a>', '>发布规划</a>'],
     ['>Architecture</a>', '>架构</a>'],
     ['>Evidence</a>', '>验证</a>'],
     ['<a href="./docs/">Docs</a>', '<a href="../docs/zh-CN/">文档</a>'],
@@ -758,6 +794,8 @@ const englishToolsUi = {
   PAGE_TITLE: 'Binary Patch Toolkit — react-native-bs-diff-patch',
   PLAYGROUND_LABEL: 'Playground',
   PLAYGROUND_PATH: '/#playground',
+  PLANNER_LABEL: 'Release Planner',
+  PLANNER_PATH: '/planner/',
   PRIMARY_NAVIGATION_LABEL: 'Primary navigation',
   READY_LABEL: 'Ready',
   RECIPES_PATH: '/docs/recipes/',
@@ -792,6 +830,8 @@ const chineseToolsUi = {
   PAGE_TITLE: '二进制补丁工具箱 — react-native-bs-diff-patch',
   PLAYGROUND_LABEL: '在线实验',
   PLAYGROUND_PATH: '/zh-CN/#playground',
+  PLANNER_LABEL: '发布规划',
+  PLANNER_PATH: '/zh-CN/planner/',
   PRIMARY_NAVIGATION_LABEL: '主导航',
   READY_LABEL: '就绪',
   RECIPES_PATH: '/docs/zh-CN/recipes/',
@@ -810,6 +850,64 @@ function renderToolsPage(template, ui) {
     return ui[key];
   });
 }
+
+const englishPlannerUi = {
+  ALTERNATE_LABEL: '中文',
+  ALTERNATE_LANGUAGE: 'zh-CN',
+  ALTERNATE_PATH: '/zh-CN/planner/',
+  CANONICAL_PATH: '/planner/',
+  CLOSE_LABEL: 'Close',
+  DOCS_LABEL: 'Docs',
+  DOCS_PATH: '/docs/',
+  FOOTER_NAVIGATION_LABEL: 'Footer navigation',
+  FOOTER_TEXT: 'MIT licensed. Built for React Native runtimes.',
+  HOME_ARIA_LABEL: 'react-native-bs-diff-patch home',
+  HOME_LABEL: 'Home',
+  HOME_PATH: '/',
+  LANG: 'en',
+  MENU_LABEL: 'Menu',
+  META_DESCRIPTION:
+    'Build a multi-baseline binary patch matrix, verified bundle manifest, and full-file fallback plan locally in your browser.',
+  NO_FILE_LABEL: 'No file selected',
+  PAGE_TITLE: 'Release Planner — react-native-bs-diff-patch',
+  PLANNER_LABEL: 'Release Planner',
+  PRIMARY_NAVIGATION_LABEL: 'Primary navigation',
+  READY_LABEL: 'Ready to plan a release',
+  REPORT_EMPTY: 'The patch matrix will appear after planning.',
+  RUNTIME_LOADING: 'Loading Web API',
+  SKIP_LABEL: 'Skip to release planner',
+  TOOLS_LABEL: 'Tools',
+  TOOLS_PATH: '/tools/',
+};
+
+const chinesePlannerUi = {
+  ALTERNATE_LABEL: 'English',
+  ALTERNATE_LANGUAGE: 'en',
+  ALTERNATE_PATH: '/planner/',
+  CANONICAL_PATH: '/zh-CN/planner/',
+  CLOSE_LABEL: '关闭',
+  DOCS_LABEL: '中文文档',
+  DOCS_PATH: '/docs/zh-CN/',
+  FOOTER_NAVIGATION_LABEL: '页脚导航',
+  FOOTER_TEXT: 'MIT 许可，为 React Native 多运行时构建。',
+  HOME_ARIA_LABEL: 'react-native-bs-diff-patch 中文首页',
+  HOME_LABEL: '首页',
+  HOME_PATH: '/zh-CN/',
+  LANG: 'zh-CN',
+  MENU_LABEL: '菜单',
+  META_DESCRIPTION:
+    '直接在浏览器本地生成多基线补丁矩阵、可验证 bundle manifest 和完整文件回退计划。',
+  NO_FILE_LABEL: '尚未选择文件',
+  PAGE_TITLE: '发布规划 — react-native-bs-diff-patch',
+  PLANNER_LABEL: '发布规划',
+  PRIMARY_NAVIGATION_LABEL: '主导航',
+  READY_LABEL: '准备好规划发布',
+  REPORT_EMPTY: '生成计划后将在这里显示补丁矩阵。',
+  RUNTIME_LOADING: '正在加载 Web API',
+  SKIP_LABEL: '跳到发布规划正文',
+  TOOLS_LABEL: '工具',
+  TOOLS_PATH: '/zh-CN/tools/',
+};
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
@@ -869,9 +967,40 @@ await writeFile(
   renderToolsPage(toolsTemplate, chineseToolsUi)
 );
 
+const plannerTemplate = await readFile(
+  path.join(siteDirectory, 'planner', 'index.html'),
+  'utf8'
+);
+const plannerOutputDirectory = path.join(outputDirectory, 'planner');
+await mkdir(plannerOutputDirectory, { recursive: true });
+await writeFile(
+  path.join(plannerOutputDirectory, 'index.html'),
+  renderToolsPage(plannerTemplate, englishPlannerUi)
+);
+const chinesePlannerOutputDirectory = path.join(
+  chineseHomepageDirectory,
+  'planner'
+);
+await mkdir(chinesePlannerOutputDirectory, { recursive: true });
+await writeFile(
+  path.join(chinesePlannerOutputDirectory, 'index.html'),
+  renderToolsPage(plannerTemplate, chinesePlannerUi)
+);
+
 await cp(
   path.join(repositoryDirectory, 'web'),
   path.join(outputDirectory, 'web'),
+  {
+    recursive: true,
+  }
+);
+await rm(path.join(outputDirectory, 'web', 'progress_bridge.c'));
+await rm(path.join(outputDirectory, 'web', 'minimal-runtime-pre.js'), {
+  force: true,
+});
+await cp(
+  path.join(repositoryDirectory, 'toolkit'),
+  path.join(outputDirectory, 'toolkit'),
   {
     recursive: true,
   }

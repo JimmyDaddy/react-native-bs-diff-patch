@@ -16,7 +16,7 @@ jobs:
   publish-npm:
     name: Publish to npm with OIDC
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout the release tag
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -86,7 +86,11 @@ jobs:
           yarn test:web
           yarn test:web:browser
           yarn test:web:metro
+          yarn test:toolkit
+          yarn test:node
+          yarn test:action
           yarn test:package
+          yarn test:sdk
           npm pack --dry-run --ignore-scripts
         env:
           CHROME_PATH: /usr/bin/google-chrome
@@ -109,3 +113,9 @@ jobs:
           done
           echo 'Published package did not expose provenance metadata in time.' >&2
           exit 1
+
+      - name: Smoke test the published SDK
+        env:
+          PACKAGE_SPEC: react-native-bs-diff-patch@${{ steps.release.outputs.package_version }}
+          CHROME_PATH: /usr/bin/google-chrome
+        run: yarn test:sdk
