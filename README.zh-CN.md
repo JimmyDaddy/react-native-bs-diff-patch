@@ -83,19 +83,21 @@ npx react-native-bs-diff-patch bundle \
 
 ## 安装
 
+React Native、Node.js 和 CLI 消费者：
+
 ```sh
 npm install react-native-bs-diff-patch@^0.5.0
 ```
 
-明确的 `/web` 与 `/toolkit` 入口属于 0.5.0。发布前验证本地准备的包时，也可以改用其
-tarball：
+独立浏览器和桌面 WebView 消费者：
 
 ```sh
-npm install ./react-native-bs-diff-patch-0.5.0.tgz
+npm install bs-diff-patch-web@^0.5.0
 ```
 
-registry 的 0.4.x 包尚未包含这些子路径。资源图和消费者检查详见
-[Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md)。
+发布前验证本地准备的包时，可以在干净消费者中将对应安装命令替换为 tarball。独立 Web
+包使用 `bs-diff-patch-web-0.5.0.tgz`；React Native 包仍使用自己的 tarball。资源图、迁移
+和消费者检查详见[Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md)。
 
 iOS 还需要安装 Pods，并重新构建原生应用：
 
@@ -150,13 +152,13 @@ try {
 
 ## Web：第一次往返
 
-独立浏览器、Vite 和 Tauri 消费者应导入明确的
-`react-native-bs-diff-patch/web` ESM 入口；它提供字节 API，不需要 React Native。
-根包继续为已有应用保留 React Native 与 browser 条件解析。发布资源图和 CSP 见
+独立浏览器、Vite 和 Tauri 消费者应安装 `bs-diff-patch-web` 并导入其 ESM 根入口；它提供
+不需要 React Native、Node.js 或 Node sidecar 的字节 API。已有应用可以继续使用
+`react-native-bs-diff-patch/web`，该入口仍受支持。资源图、迁移和 CSP 见
 [Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md)。
 
 ```ts
-import { diffBytes, patchBytes } from 'react-native-bs-diff-patch/web';
+import { diffBytes, patchBytes } from 'bs-diff-patch-web';
 
 const patchBytesValue = await diffBytes(oldFile, newFile, {
   signal: abortController.signal,
@@ -242,7 +244,8 @@ npm 包消费测试还覆盖 browser、ESM、CommonJS、Metro 与 TypeScript 解
 ## 完整文档
 
 - [Web 与桌面 WebView SDK](./docs/zh-CN/web-sdk.md) — 从 Vite 或 Tauri 使用明确的
-  `/web` 与 `/toolkit` ESM 入口，无需 React Native 或 Node sidecar。
+  `bs-diff-patch-web` 与其 `/toolkit` 入口，无需 React Native 或 Node sidecar；已有
+  `react-native-bs-diff-patch/web` 与 `/toolkit` 消费者继续受支持。
 - [快速开始](./docs/zh-CN/getting-started.md)
 - [API 参考](./docs/zh-CN/api-reference.md)
 - [生产实践](./docs/zh-CN/recipes.md)

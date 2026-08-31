@@ -11,6 +11,12 @@ on:
         default: react-native-bs-diff-patch@latest
         type: string
 
+      web_package_spec:
+        description: Standalone Web npm package spec to validate
+        required: false
+        default: bs-diff-patch-web@latest
+        type: string
+
 permissions:
   contents: read
 
@@ -41,3 +47,20 @@ jobs:
         env:
           PACKAGE_SPEC: ${{ inputs.package_spec || 'react-native-bs-diff-patch@latest' }}
         run: node scripts/test-registry-consumers.mjs ${{ matrix.consumer }}
+
+  standalone-web:
+    name: Standalone Web registry consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js and dependencies
+        uses: ./.github/actions/setup
+
+      - name: Test published standalone Web package
+        env:
+          PACKAGE_SPEC: ${{ inputs.web_package_spec || 'bs-diff-patch-web@latest' }}
+          CHROME_PATH: /usr/bin/google-chrome
+        run: yarn test:web:package

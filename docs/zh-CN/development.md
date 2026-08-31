@@ -42,8 +42,10 @@ yarn test:sdk
 - `test:web:metro` 证明 Metro 选择 `.web` 入口，而不是原生 TurboModule facade。
 - `test:package` 将真实 tarball 安装到干净消费者，验证 browser、ESM、CommonJS、
   TypeScript 与可选 peer 行为。
-- `test:sdk` 将准备好的 tarball 安装到隔离 Vite 消费者，验证明确的 `/web` 与
-  `/toolkit` ESM 入口、生产资源加载和真实字节往返。
+- `test:sdk` 将准备好的 RN tarball 安装到隔离 Vite 消费者，验证 `/web` 与 `/toolkit`、
+  生产资源加载和真实字节往返。
+- `test:web:package` 构建并检查独立 Web tarball，在无 RN 依赖的干净消费者中验证包根与 `/toolkit`。
+- `test:web:registry` 验证版本不存在、内容不符、网络失败与 provenance 策略等发布保护。
 
 ## 原生健壮性与兼容性
 
@@ -171,6 +173,12 @@ npm 包的 Trusted Publisher 已按以下值配置完成：
 - Environment：留空。
 
 正常发布无需再修改 npm 侧配置，工作流也不使用长期 npm token。
+
+上面的清单针对已有的 `react-native-bs-diff-patch` 包。独立的 `bs-diff-patch-web` 使用
+`web-v0.5.0` tag 命名空间独立发布，不替代、不弃用也不重新发布 React Native 包。Node
+文件系统操作、CLI 及其发布工具继续属于 `react-native-bs-diff-patch`。
+首版本地发布、随后配置 Trusted Publishing、独立 `web-npm-publish.yml` 和同内容重试规则
+见[独立 Web 包设计](https://github.com/JimmyDaddy/react-native-bs-diff-patch/blob/main/docs/standalone-web-package-design.md)。
 
 ## npm 发布失败后的恢复
 

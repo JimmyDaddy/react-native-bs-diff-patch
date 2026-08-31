@@ -1,0 +1,178 @@
+name: Publish standalone Web npm package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published Web release tag to publish or verify (web-v0.5.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: web-npm-publish-${{ inputs.release_tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish-web:
+    name: Publish or verify Web package
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'web-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+      CHROME_PATH: /usr/bin/google-chrome
+    steps:
+      - name: Validate release request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" != refs/heads/main ]]; then
+            echo 'Manual publication must use the main workflow.' >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_TAG" =~ ^web-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo 'A web-v version tag is required.' >&2
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/release.json"
+          jq -e --arg tag "$RELEASE_TAG" '.draft == false and .published_at != null and .tag_name == $tag' "$RUNNER_TEMP/release.json" > /dev/null
+
+      - name: Checkout exact release source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js for trusted publishing
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+
+      - name: Install package managers and dependencies
+        run: |
+          corepack enable
+          npm install --global npm@12.0.1
+          yarn install --immutable
+
+      - name: Verify release identity
+        id: release
+        run: |
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          test "$(git rev-parse HEAD)" = "$tag_commit"
+          git merge-base --is-ancestor HEAD origin/main
+          package_version="$(node -p "require('./packages/web/package.json').version")"
+          test "$RELEASE_TAG" = "web-v$package_version"
+          if [[ "$package_version" == *-* ]]; then
+            prerelease="${package_version#*-}"
+            dist_tag="${prerelease%%.*}"
+          else
+            dist_tag=latest
+          fi
+          if [[ ! "$dist_tag" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            echo 'Invalid npm dist-tag derived from package version.' >&2
+            exit 1
+          fi
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Run release quality gates
+        run: |
+          yarn prepare
+          yarn typecheck
+          yarn lint
+          yarn test --runInBand
+          yarn test:web
+          yarn test:web:browser
+          yarn test:web:metro
+          yarn test:toolkit
+          yarn test:node
+          yarn test:action
+          yarn test:package
+          yarn test:sdk
+          yarn test:web:registry
+          yarn test:web:package
+          git diff --exit-code HEAD
+
+      - name: Pack immutable candidate
+        id: candidate
+        run: |
+          cd build/web-package
+          npm pack --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/web-pack.json"
+          filename="$(node -e 'const m=require(process.argv[1]); const e=Array.isArray(m)?m:Object.values(m); if(e.length!==1)process.exit(1); process.stdout.write(e[0].filename)' "$RUNNER_TEMP/web-pack.json")"
+          echo "tarball=$RUNNER_TEMP/$filename" >> "$GITHUB_OUTPUT"
+
+      - name: Test exact candidate and check registry
+        id: registry
+        env:
+          PACKAGE_TARBALL: ${{ steps.candidate.outputs.tarball }}
+        run: |
+          yarn test:web:package
+          node scripts/web-package-registry.mjs status "$PACKAGE_TARBALL" > "$RUNNER_TEMP/web-registry-status.json"
+          echo "published=$(jq -r '.published' "$RUNNER_TEMP/web-registry-status.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish new version using OIDC
+        if: steps.registry.outputs.published == 'false'
+        env:
+          PACKAGE_TARBALL: ${{ steps.candidate.outputs.tarball }}
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+        run: npm publish "$PACKAGE_TARBALL" --provenance --access public --tag "$DIST_TAG" --registry=https://registry.npmjs.org/
+
+      - name: Verify registry bytes and provenance policy
+        env:
+          PACKAGE_TARBALL: ${{ steps.candidate.outputs.tarball }}
+          ALREADY_PUBLISHED: ${{ steps.registry.outputs.published }}
+        run: |
+          provenance=()
+          if [[ "$ALREADY_PUBLISHED" != true ]]; then
+            provenance+=(--require-provenance)
+          fi
+          verified=false
+          for attempt in $(seq 1 12); do
+            if node scripts/web-package-registry.mjs verify "$PACKAGE_TARBALL" "${provenance[@]}" > "$RUNNER_TEMP/web-registry-verification.json"; then
+              verified=true
+              break
+            fi
+            echo "Registry verification pending (attempt $attempt)."
+            sleep 5
+          done
+          test "$verified" = true
+          cat "$RUNNER_TEMP/web-registry-verification.json"
+          if [[ "$ALREADY_PUBLISHED" == true ]]; then
+            echo 'Existing identical release verified; no upload or retroactive provenance claim.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Smoke test official registry package
+        env:
+          PACKAGE_SPEC: bs-diff-patch-web@${{ steps.release.outputs.version }}
+        run: yarn test:web:package
+
+      - name: Verify npm registry signatures
+        env:
+          PACKAGE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir "$RUNNER_TEMP/web-signatures"
+          cd "$RUNNER_TEMP/web-signatures"
+          npm init --yes
+          npm install --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/ "bs-diff-patch-web@$PACKAGE_VERSION"
+          npm audit signatures --registry=https://registry.npmjs.org/
+
+      - name: Archive publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-package-publication
+          path: |
+            ${{ runner.temp }}/bs-diff-patch-web-*.tgz
+            ${{ runner.temp }}/web-pack.json
+            ${{ runner.temp }}/web-registry-*.json
+          if-no-files-found: ignore
+          retention-days: 30

@@ -101,6 +101,11 @@ jobs:
                   ios=true
                   quality=true
                   ;;
+                packages/web/**|scripts/build-web-package.mjs|scripts/check-web-package-contract.mjs|scripts/test-web-package*.mjs|scripts/web-package-*.mjs|.github/workflows/web-npm-publish.yml)
+                  web=true
+                  quality=true
+                  site=true
+                  ;;
                 web/**|fixtures/**|scripts/build-web-wasm.sh|scripts/test-web*.mjs|scripts/web-*)
                   android=true
                   ios=true
@@ -471,6 +476,35 @@ jobs:
       - name: Verify npm package contents
         run: npm pack --dry-run --ignore-scripts
 
+  web-package-test:
+    name: Standalone Web Package Consumers
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up release Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install package managers and dependencies
+        run: |
+          corepack enable
+          npm install --global npm@12.0.1
+          yarn install --immutable
+
+      - name: Test standalone package and publication guards
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          yarn test:web:registry
+          yarn test:web:package
+
   quality:
     name: Lint, TypeScript, and Jest
     needs: changes
@@ -528,6 +562,7 @@ jobs:
         ios-build-test,
         ios-rn-compatibility,
         web-test,
+        web-package-test,
         site-test,
       ]
     if: always()

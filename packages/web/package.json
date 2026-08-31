@@ -1,0 +1,47 @@
+{
+  "name": "bs-diff-patch-web",
+  "version": "0.5.0",
+  "description": "Browser Web Worker and WebAssembly binary diff, patch, and verified delta toolkit",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "types": "./index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./index.d.mts",
+      "import": "./index.mjs",
+      "default": "./index.mjs"
+    },
+    "./toolkit": {
+      "types": "./toolkit/index.d.ts",
+      "import": "./toolkit/index.mjs",
+      "default": "./toolkit/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "keywords": [
+    "bsdiff",
+    "binary-diff",
+    "binary-patch",
+    "browser",
+    "wasm",
+    "web-worker"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JimmyDaddy/react-native-bs-diff-patch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JimmyDaddy/react-native-bs-diff-patch/issues"
+  },
+  "homepage": "https://bs-dff-patch.corerobin.com",
+  "scripts": {
+    "build": "node ../../scripts/build-web-package.mjs",
+    "check": "node ../../scripts/check-web-package-contract.mjs",
+    "prepack": "node ../../scripts/build-web-package.mjs --refuse-source-pack"
+  }
+}

@@ -75,8 +75,8 @@ yarn test:web:metro
 yarn test:sdk
 ```
 
-`test:sdk` installs the prepared package tarball into an isolated consumer and
-checks the public `/web` and `/toolkit` ESM entries, the production Vite
+`test:sdk` installs the prepared React Native package tarball into an isolated
+consumer and checks its `/web` and `/toolkit` ESM entries, the production Vite
 resource graph, and real byte round trips. It does not use a workspace link or
 the registry's older package.
 
@@ -120,6 +120,13 @@ version, create the tag, and publish the GitHub Release. Publishing that release
 starts `.github/workflows/npm-publish.yml`, which publishes to npm through OIDC
 Trusted Publishing and verifies the package provenance. No long-lived npm token
 is stored in GitHub.
+
+The flow in this section is for the existing `react-native-bs-diff-patch`
+package. The standalone Web package `bs-diff-patch-web` has its own release and
+tag namespace (`web-v0.5.0`) and does not replace, deprecate, or republish the
+React Native package. Keep Node filesystem operations, the CLI, and related
+release tooling on `react-native-bs-diff-patch`. See the [standalone Web package
+design and first-publication procedure](./docs/standalone-web-package-design.md).
 
 Maintainers should run the quality gates, then create the release:
 
@@ -196,8 +203,11 @@ The `package.json` file contains various scripts for common tasks:
 - `yarn test:web`: verify the WebAssembly patch format and round trip.
 - `yarn test:web:browser`: exercise the public Web Worker API in Chrome.
 - `yarn test:web:metro`: verify Metro resolves the React Native Web entry.
-- `yarn test:sdk`: install the prepared tarball and verify `/web` and `/toolkit`
+- `yarn test:sdk`: install the prepared RN tarball and verify `/web` and `/toolkit`
   from an isolated Vite consumer.
+- `yarn test:web:package`: build and check the independent Web tarball, then verify
+  its root and `/toolkit` from an isolated consumer without RN dependencies.
+- `yarn test:web:registry`: verify the registry publication safety guards.
 - `node scripts/check-package-contract.mjs`: verify exports, declarations,
   packed assets, and the Node-free browser resource graph.
 - `yarn site:build`: render public Markdown and static site assets into `site-dist/`.
