@@ -44,7 +44,7 @@ jobs:
           jq -e --arg tag "$RELEASE_TAG" '.draft == false and .published_at != null and .tag_name == $tag' "$RUNNER_TEMP/release.json" > /dev/null
 
       - name: Checkout exact release source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
