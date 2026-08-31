@@ -153,6 +153,34 @@ repository and the `npm-publish.yml` workflow. No npm-side configuration is
 required for a release. The release tag must exactly match
 `v<package.json version>`.
 
+### Recovering a failed npm publication
+
+For an existing tag and published GitHub Release (the example below uses
+`v0.5.0`), recovery reuses that release. Classify a failed publication by
+checking the registry first:
+
+```sh
+npm view react-native-bs-diff-patch@0.5.0 version \
+  dist.attestations.provenance.predicateType --registry=https://registry.npmjs.org/
+```
+
+If `0.5.0` is already present, do not run `npm publish` again; complete only
+the provenance and registry consumer checks. If the registry confirms an
+explicit E404, fix the publishing tool or fixture, merge that fix into `main`,
+and retry the existing release from `main`:
+
+```sh
+gh workflow run npm-publish.yml --ref main -f release_tag=v0.5.0
+gh run list --workflow npm-publish.yml --limit 5
+gh run watch <run-id>
+```
+
+See [Development and verification](./docs/development.md#recovering-a-failed-npm-publication)
+for the exact tag checkout, commit, fixture, tree-cleanliness, OIDC, provenance,
+and registry-smoke invariants. Do not move or delete the existing tag, run
+release-it again for the same version, or change the npm Trusted Publisher
+configuration.
+
 ### Scripts
 
 The `package.json` file contains various scripts for common tasks:
