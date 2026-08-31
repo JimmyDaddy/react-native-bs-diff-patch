@@ -38,8 +38,8 @@ const chromeCandidates = [
 ].filter(Boolean);
 const browserCsp =
   "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'";
-const registry040TarballUrl =
-  'https://registry.npmjs.org/react-native-bs-diff-patch/-/react-native-bs-diff-patch-0.4.0.tgz';
+const registry040PackageSpec = 'react-native-bs-diff-patch@0.4.0';
+const officialNpmRegistry = 'https://registry.npmjs.org/';
 const registry040Integrity =
   'sha512-pQXEVIn9yx8zqYtJjnw2xws3g3EB8E2Qz8N5WTwyUtUSpW/fhBFUtE1ACqbVvW6LE+7ndy7NjlrTJIERD0Y0lQ==';
 
@@ -153,15 +153,25 @@ function readPackedManifest(tarballPath) {
 }
 
 async function prepareRegistry040Tarball() {
+  const registryPackageDirectory = path.join(
+    temporaryDirectory,
+    'registry-package-resolution'
+  );
+  await mkdir(registryPackageDirectory);
   const metadata = parseTrailingJson(
-    run('npm', [
-      'pack',
-      '--ignore-scripts',
-      '--json',
-      '--pack-destination',
-      temporaryDirectory,
-      registry040TarballUrl,
-    ])
+    run(
+      'npm',
+      [
+        'pack',
+        '--ignore-scripts',
+        '--json',
+        '--pack-destination',
+        temporaryDirectory,
+        `--registry=${officialNpmRegistry}`,
+        registry040PackageSpec,
+      ],
+      { cwd: registryPackageDirectory }
+    )
   );
   const tarballPath = path.join(
     temporaryDirectory,

@@ -171,3 +171,41 @@ npm 包的 Trusted Publisher 已按以下值配置完成：
 - Environment：留空。
 
 正常发布无需再修改 npm 侧配置，工作流也不使用长期 npm token。
+
+## npm 发布失败后的恢复
+
+对于已有 tag 和已发布的 GitHub Release（以下示例使用 `v0.5.0`），恢复流程会复用已有
+release。重试失败的 `npm-publish.yml` 前，先检查 registry：
+
+```sh
+npm view react-native-bs-diff-patch@0.5.0 version \
+  dist.attestations.provenance.predicateType --registry=https://registry.npmjs.org/
+```
+
+如果 `0.5.0` 已经存在，不要再次运行 `npm publish`，只补做 provenance 和 registry
+消费者检查，例如 `PACKAGE_SPEC=react-native-bs-diff-patch@0.5.0 yarn test:sdk`，以及适用的
+`yarn test:registry:vite` 或 `yarn test:registry:expo`。只有官方 registry 查询明确返回 E404
+时才可继续重试；网络错误、403、超时或其他不确定结果都必须停止恢复流程。修复发布工具或
+fixture 后，将修复合并到 `main`，再从 `main` 重试已有 GitHub Release：
+
+```sh
+gh workflow run npm-publish.yml --ref main -f release_tag=v0.5.0
+gh run list --workflow npm-publish.yml --limit 5
+gh run watch <run-id>
+```
+
+重试完成后，先检查 workflow run、provenance 元数据和 registry smoke 输出，再宣布版本可用。
+
+手动 workflow 只接受已经发布的 GitHub Release。它会从精确的
+`refs/tags/<release_tag>` checkout 并确认 `HEAD` 就是该 tag 的 commit，然后检查 release
+tag 与 `package.json` 版本一致、tag 和 workflow commit 可从 `main` 到达，以及 npm 中尚不
+存在该版本。质量门禁期间可以临时使用 workflow commit 中的 `test-sdk-consumers` harness，
+打包前恢复 tag 中的脚本，并断言 tracked tree 干净。完整门禁、npm OIDC Trusted Publishing、
+provenance 校验和发布包 smoke test 均保留在 workflow 中。
+
+npm 12 的跨版本 fixture 必须通过官方 registry（`https://registry.npmjs.org/`）解析精确的
+包版本，并比对预期的 SHA-512 SRI。不要恢复下载 URL fixture，也不要为了绕过 npm 默认的
+URL 策略而削弱完整性断言。
+
+不要移动或删除已有 tag，不要对同一版本再次运行 release-it，也不要修改 npm Trusted Publisher
+配置。重试只修复已有 GitHub Release 的发布路径，不会创建第二个 release。

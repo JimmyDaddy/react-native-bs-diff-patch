@@ -187,3 +187,50 @@ The npm package's Trusted Publisher is already configured with these values:
 
 No npm-side change is required for a normal release, and the workflow does not
 use a long-lived npm token.
+
+## Recovering a failed npm publication
+
+For an existing tag and published GitHub Release (the examples below use
+`v0.5.0`), recovery reuses that release. Check the registry before retrying a
+failed `npm-publish.yml` run:
+
+```sh
+npm view react-native-bs-diff-patch@0.5.0 version \
+  dist.attestations.provenance.predicateType --registry=https://registry.npmjs.org/
+```
+
+If `0.5.0` is already published, do not publish it again. Finish only the
+provenance and registry smoke checks, such as
+`PACKAGE_SPEC=react-native-bs-diff-patch@0.5.0 yarn test:sdk` and the applicable
+`yarn test:registry:vite` or `yarn test:registry:expo` check. Proceed with a
+retry only when the official registry query confirms an explicit E404; network
+errors, 403 responses, timeouts, and any other ambiguous result must stop the
+recovery. After fixing the release tool or fixture, merge that fix into `main`
+and retry the existing GitHub Release from `main`:
+
+```sh
+gh workflow run npm-publish.yml --ref main -f release_tag=v0.5.0
+gh run list --workflow npm-publish.yml --limit 5
+gh run watch <run-id>
+```
+
+After the retry completes, inspect the run, provenance metadata, and registry
+smoke output before announcing availability.
+
+The manual workflow accepts only an existing published GitHub Release. It
+checks out the exact `refs/tags/<release_tag>` commit and verifies that `HEAD`
+matches that tag, then checks the tag/package version, tag and workflow commit
+reachability from `main`, and that the npm version is not already present. It
+temporarily takes the `test-sdk-consumers` harness from the workflow commit for
+the quality gates, restores the tag script before packing, and asserts that the
+tracked tree is clean. The full quality gates, OIDC Trusted Publishing,
+provenance verification, and published-package smoke test remain enabled.
+
+The npm 12 cross-version fixture resolves an exact package version through the
+official `https://registry.npmjs.org/` registry and compares its expected
+SHA-512 SRI. Keep that exact-registry resolution; do not restore a download URL
+fixture or weaken its integrity assertion.
+
+Do not move or delete the existing tag, run release-it again for the same
+version, or change the npm Trusted Publisher settings. A retry repairs the
+publication path for the existing release.
