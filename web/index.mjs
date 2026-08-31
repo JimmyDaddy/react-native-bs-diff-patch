@@ -4,6 +4,39 @@ function createError(code, message) {
   return error;
 }
 
+const ERROR_CATEGORIES = new Map([
+  ['EABORTED', 'ABORTED'],
+  ['ECANCELLED', 'ABORTED'],
+  ['ERESOURCE', 'RESOURCE'],
+  ['EINPUT_TOO_LARGE', 'RESOURCE'],
+  ['EOUTPUT_TOO_LARGE', 'RESOURCE'],
+  ['EINVAL', 'INVALID_ARGUMENT'],
+  ['EINVALID_MANIFEST', 'INVALID_PATCH'],
+  ['EPATCH', 'INVALID_PATCH'],
+  ['ELEGACYFORMAT', 'INVALID_PATCH'],
+  ['EBASELINEMISMATCH', 'VERIFICATION'],
+  ['EPATCHMISMATCH', 'VERIFICATION'],
+  ['ETARGETMISMATCH', 'VERIFICATION'],
+  ['EDESTEXISTS', 'DESTINATION'],
+  ['EUNSUPPORTED', 'UNSUPPORTED'],
+]);
+
+export function classifyPatchError(error) {
+  const code =
+    error && typeof error === 'object' && typeof error.code === 'string'
+      ? error.code
+      : 'EUNSPECIFIED';
+  return {
+    category: ERROR_CATEGORIES.get(code) || 'RUNTIME',
+    code,
+    message:
+      error instanceof Error
+        ? error.message
+        : String(error || 'unknown patch error'),
+    retryable: code === 'EABORTED' || code === 'ECANCELLED',
+  };
+}
+
 const PATCH_MAGIC = 'ENDSLEY/BSDIFF43';
 const PATCH_HEADER_BYTES = 24;
 
@@ -13,6 +46,29 @@ function validateLimit(value, fieldName) {
       'EINVAL',
       `${fieldName} must be a non-negative safe integer`
     );
+  }
+}
+
+function validateOperationOptions(options) {
+  if (options === null || typeof options !== 'object') {
+    throw createError('EINVAL', 'operation options must be an object');
+  }
+  validateLimit(options.maxInputBytes, 'maxInputBytes');
+  validateLimit(options.maxOutputBytes, 'maxOutputBytes');
+  if (
+    options.signal !== undefined &&
+    (!options.signal ||
+      typeof options.signal.addEventListener !== 'function' ||
+      typeof options.signal.removeEventListener !== 'function' ||
+      typeof options.signal.aborted !== 'boolean')
+  ) {
+    throw createError('EINVAL', 'signal must be an AbortSignal');
+  }
+  if (
+    options.onProgress !== undefined &&
+    typeof options.onProgress !== 'function'
+  ) {
+    throw createError('EINVAL', 'onProgress must be a function');
   }
 }
 
@@ -35,7 +91,7 @@ function enforceLimit(actualBytes, maximumBytes, fieldName) {
   }
 }
 
-function decodePatchMetadata(patchData) {
+function decodePatchMetadata(patchData, patchBytes = patchData.byteLength) {
   const headerBytes = Math.min(patchData.byteLength, PATCH_HEADER_BYTES);
   const legacyMagic = String.fromCharCode(
     ...patchData.slice(0, Math.min(8, patchData.byteLength))
@@ -44,9 +100,9 @@ function decodePatchMetadata(patchData) {
     ...patchData.slice(0, Math.min(16, patchData.byteLength))
   );
   const common = {
-    patchBytes: patchData.byteLength,
+    patchBytes,
     headerBytes,
-    payloadBytes: Math.max(0, patchData.byteLength - PATCH_HEADER_BYTES),
+    payloadBytes: Math.max(0, patchBytes - PATCH_HEADER_BYTES),
   };
 
   if (patchData.byteLength < PATCH_HEADER_BYTES) {
@@ -125,6 +181,46 @@ async function toUint8Array(input, fieldName) {
   );
 }
 
+async function readPatchHeader(input) {
+  const patchBytes = inputByteLength(input);
+
+  if (input instanceof ArrayBuffer) {
+    return {
+      bytes: new Uint8Array(
+        input,
+        0,
+        Math.min(input.byteLength, PATCH_HEADER_BYTES)
+      ),
+      patchBytes: input.byteLength,
+    };
+  }
+
+  if (ArrayBuffer.isView(input)) {
+    return {
+      bytes: new Uint8Array(
+        input.buffer,
+        input.byteOffset,
+        Math.min(input.byteLength, PATCH_HEADER_BYTES)
+      ),
+      patchBytes: input.byteLength,
+    };
+  }
+
+  if (typeof Blob !== 'undefined' && input instanceof Blob) {
+    return {
+      bytes: new Uint8Array(
+        await input.slice(0, PATCH_HEADER_BYTES).arrayBuffer()
+      ),
+      patchBytes: input.size,
+    };
+  }
+
+  throw createError(
+    'EINVAL',
+    'patchData must be an ArrayBuffer, ArrayBufferView, or Blob'
+  );
+}
+
 let sharedWorker;
 let sharedRequestId = 0;
 const sharedRequests = new Map();
@@ -152,45 +248,72 @@ function getSharedWorker() {
     return sharedWorker;
   }
 
-  sharedWorker = new Worker(new URL('./worker.mjs', import.meta.url), {
+  const worker = new Worker(new URL('./worker.browser.mjs', import.meta.url), {
     type: 'module',
   });
-  sharedWorker.onmessage = (event) => {
-    const request = sharedRequests.get(event.data && event.data.id);
+  const resetForWorker = (error) => {
+    if (sharedWorker === worker) {
+      resetSharedWorker(error);
+    }
+  };
+  sharedWorker = worker;
+  worker.onmessage = (event) => {
+    if (sharedWorker !== worker) {
+      return;
+    }
+    const data = event.data;
+    const request = sharedRequests.get(data && data.id);
     if (!request) {
       return;
     }
-    sharedRequests.delete(event.data.id);
+    if (data.type === 'progress') {
+      request.onProgress?.(data.progress);
+      return;
+    }
+    if (data.type !== 'result') {
+      resetForWorker(
+        createError('EWEBASSEMBLY', 'Shared Web Worker response was invalid')
+      );
+      return;
+    }
+    sharedRequests.delete(data.id);
 
-    if (event.data.ok) {
+    if (data.ok) {
       try {
+        if (!(data.output instanceof Uint8Array)) {
+          throw createError(
+            'EWEBASSEMBLY',
+            'Shared Web Worker returned an invalid output payload'
+          );
+        }
         enforceLimit(
-          event.data.output.byteLength,
+          data.output.byteLength,
           request.maxOutputBytes,
           'output'
         );
-        request.resolve(event.data.output);
+        request.resolve(data.output);
       } catch (error) {
         request.reject(error);
+        resetForWorker(error);
       }
       return;
     }
-    request.reject(responseError(request.operation, event.data.error));
+    request.reject(responseError(request.operation, data.error));
   };
-  sharedWorker.onerror = (event) => {
-    resetSharedWorker(
+  worker.onerror = (event) => {
+    resetForWorker(
       createError(
         'EWEBASSEMBLY',
         event.message || 'Shared Web Worker failed to load'
       )
     );
   };
-  sharedWorker.onmessageerror = () => {
-    resetSharedWorker(
+  worker.onmessageerror = () => {
+    resetForWorker(
       createError('EWEBASSEMBLY', 'Shared Web Worker response was invalid')
     );
   };
-  return sharedWorker;
+  return worker;
 }
 
 function runSharedWorker(operation, oldFileData, inputFileData, options) {
@@ -201,20 +324,19 @@ function runSharedWorker(operation, oldFileData, inputFileData, options) {
     sharedRequests.set(id, {
       maxOutputBytes: options.maxOutputBytes,
       operation,
+      onProgress: options.onProgress,
       reject,
       resolve,
     });
     try {
-      worker.postMessage(
-        {
-          id,
-          operation,
-          oldFileData,
-          inputFileData,
-          maxOutputBytes: options.maxOutputBytes,
-        },
-        [oldFileData.buffer, inputFileData.buffer]
-      );
+      worker.postMessage({
+        id,
+        operation,
+        oldFileData,
+        inputFileData,
+        maxInputBytes: options.maxInputBytes,
+        maxOutputBytes: options.maxOutputBytes,
+      });
     } catch (error) {
       sharedRequests.delete(id);
       reject(error);
@@ -224,7 +346,7 @@ function runSharedWorker(operation, oldFileData, inputFileData, options) {
 
 function runDedicatedWorker(operation, oldFileData, inputFileData, options) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./worker.mjs', import.meta.url), {
+    const worker = new Worker(new URL('./worker.browser.mjs', import.meta.url), {
       type: 'module',
     });
     let settled = false;
@@ -249,9 +371,23 @@ function runDedicatedWorker(operation, oldFileData, inputFileData, options) {
     }
 
     worker.onmessage = (event) => {
-      if (event.data && event.data.ok) {
-        const output = event.data.output;
+      if (settled) {
+        return;
+      }
+      const data = event.data;
+      if (data && data.type === 'progress') {
+        options.onProgress?.(data.progress);
+        return;
+      }
+      if (data && data.type === 'result' && data.ok) {
+        const output = data.output;
         try {
+          if (!(output instanceof Uint8Array)) {
+            throw createError(
+              'EWEBASSEMBLY',
+              `${operation} worker returned an invalid output payload`
+            );
+          }
           enforceLimit(output.byteLength, options.maxOutputBytes, 'output');
           finish(() => resolve(output));
         } catch (error) {
@@ -260,8 +396,14 @@ function runDedicatedWorker(operation, oldFileData, inputFileData, options) {
         return;
       }
 
+      if (data && data.type === 'result') {
+        finish(() => reject(responseError(operation, data.error)));
+        return;
+      }
       finish(() =>
-        reject(responseError(operation, event.data && event.data.error))
+        reject(
+          createError('EWEBASSEMBLY', `${operation} worker response was invalid`)
+        )
       );
     };
     worker.onerror = (event) => {
@@ -286,15 +428,13 @@ function runDedicatedWorker(operation, oldFileData, inputFileData, options) {
     };
 
     try {
-      worker.postMessage(
-        {
-          operation,
-          oldFileData,
-          inputFileData,
-          maxOutputBytes: options.maxOutputBytes,
-        },
-        [oldFileData.buffer, inputFileData.buffer]
-      );
+      worker.postMessage({
+        operation,
+        oldFileData,
+        inputFileData,
+        maxInputBytes: options.maxInputBytes,
+        maxOutputBytes: options.maxOutputBytes,
+      });
     } catch (error) {
       finish(() => reject(error));
     }
@@ -309,33 +449,40 @@ async function runWorker(operation, oldInput, input, options = {}) {
     );
   }
 
-  validateLimit(options.maxInputBytes, 'maxInputBytes');
-  validateLimit(options.maxOutputBytes, 'maxOutputBytes');
+  validateOperationOptions(options);
   if (options.signal?.aborted) {
     throw createError('EABORTED', `${operation} was aborted`);
   }
 
   const oldInputBytes = inputByteLength(oldInput);
   const inputBytes = inputByteLength(input);
-  if (oldInputBytes !== undefined) {
-    enforceLimit(oldInputBytes, options.maxInputBytes, 'oldData');
-  }
-  if (inputBytes !== undefined) {
-    enforceLimit(
-      inputBytes,
-      options.maxInputBytes,
-      operation === 'diff' ? 'newData' : 'patchData'
+  if (oldInputBytes === undefined) {
+    throw createError(
+      'EINVAL',
+      'oldData must be an ArrayBuffer, ArrayBufferView, or Blob'
     );
   }
-
-  const [oldFileData, inputFileData] = await Promise.all([
-    toUint8Array(oldInput, 'oldData'),
-    toUint8Array(input, operation === 'diff' ? 'newData' : 'patchData'),
-  ]);
+  if (inputBytes === undefined) {
+    throw createError(
+      'EINVAL',
+      `${
+        operation === 'diff' ? 'newData' : 'patchData'
+      } must be an ArrayBuffer, ArrayBufferView, or Blob`
+    );
+  }
+  enforceLimit(oldInputBytes, options.maxInputBytes, 'oldData');
+  enforceLimit(
+    inputBytes,
+    options.maxInputBytes,
+    operation === 'diff' ? 'newData' : 'patchData'
+  );
 
   if (operation === 'patch' && options.maxOutputBytes !== undefined) {
-    const { targetBytes: declaredOutputSize } =
-      decodePatchMetadata(inputFileData);
+    const { bytes, patchBytes } = await readPatchHeader(input);
+    const { targetBytes: declaredOutputSize } = decodePatchMetadata(
+      bytes,
+      patchBytes
+    );
     if (
       declaredOutputSize !== undefined &&
       declaredOutputSize > BigInt(options.maxOutputBytes)
@@ -348,8 +495,8 @@ async function runWorker(operation, oldInput, input, options = {}) {
   }
 
   return options.signal
-    ? runDedicatedWorker(operation, oldFileData, inputFileData, options)
-    : runSharedWorker(operation, oldFileData, inputFileData, options);
+    ? runDedicatedWorker(operation, oldInput, input, options)
+    : runSharedWorker(operation, oldInput, input, options);
 }
 
 function rejectPathApi(methodName, webMethodName = `${methodName}Bytes`) {
@@ -378,14 +525,14 @@ export function patchBytes(oldData, patchData, options) {
 }
 
 export async function inspectPatch(patchData, options = {}) {
-  validateLimit(options.maxInputBytes, 'maxInputBytes');
+  validateOperationOptions(options);
   const observedBytes = inputByteLength(patchData);
   if (observedBytes !== undefined) {
     enforceLimit(observedBytes, options.maxInputBytes, 'patchData');
   }
-  const bytes = await toUint8Array(patchData, 'patchData');
-  enforceLimit(bytes.byteLength, options.maxInputBytes, 'patchData');
-  return decodePatchMetadata(bytes).metadata;
+  const { bytes, patchBytes } = await readPatchHeader(patchData);
+  enforceLimit(patchBytes, options.maxInputBytes, 'patchData');
+  return decodePatchMetadata(bytes, patchBytes).metadata;
 }
 
 export async function verifyPatch(
@@ -394,15 +541,18 @@ export async function verifyPatch(
   expectedData,
   options = {}
 ) {
-  validateLimit(options.maxInputBytes, 'maxInputBytes');
-  validateLimit(options.maxOutputBytes, 'maxOutputBytes');
+  validateOperationOptions(options);
   if (options.signal?.aborted) {
     throw createError('EABORTED', 'verify was aborted');
   }
   const expectedByteLength = inputByteLength(expectedData);
-  if (expectedByteLength !== undefined) {
-    enforceLimit(expectedByteLength, options.maxInputBytes, 'expectedData');
+  if (expectedByteLength === undefined) {
+    throw createError(
+      'EINVAL',
+      'expectedData must be an ArrayBuffer, ArrayBufferView, or Blob'
+    );
   }
+  enforceLimit(expectedByteLength, options.maxInputBytes, 'expectedData');
   const metadata = await inspectPatch(patchData, {
     maxInputBytes: options.maxInputBytes,
   });
@@ -416,6 +566,9 @@ export async function verifyPatch(
     toUint8Array(expectedData, 'expectedData'),
     patchBytes(oldData, patchData, options),
   ]);
+  if (options.signal?.aborted) {
+    throw createError('EABORTED', 'verify was aborted');
+  }
   enforceLimit(expectedBytes.byteLength, options.maxInputBytes, 'expectedData');
   let verified = restoredBytes.byteLength === expectedBytes.byteLength;
   for (
@@ -433,27 +586,63 @@ export async function verifyPatch(
   };
 }
 
-let unsupportedNativeJobId = 0;
+let binaryJobId = 0;
 
-function unsupportedNativeJob(methodName) {
-  const id = `bsdiffpatch-web-unsupported-${++unsupportedNativeJobId}`;
+function createBinaryJob(operation, oldData, inputData, options = {}) {
+  validateOperationOptions(options);
+  const id = `bsdiffpatch-web-${Date.now().toString(36)}-${++binaryJobId}`;
+  const controller = new AbortController();
+  const listeners = new Set();
+  const abortFromCaller = () => controller.abort();
+  options.signal?.addEventListener('abort', abortFromCaller, { once: true });
+  if (options.signal?.aborted) {
+    controller.abort();
+  }
+  const run = operation === 'diff' ? diffBytes : patchBytes;
+  const result = run(oldData, inputData, {
+    ...options,
+    signal: controller.signal,
+    onProgress(progress) {
+      options.onProgress?.(progress);
+      const event = { ...progress, id };
+      for (const listener of listeners) {
+        listener(event);
+      }
+    },
+  }).finally(() => {
+    options.signal?.removeEventListener('abort', abortFromCaller);
+    listeners.clear();
+  });
+
   return {
     id,
-    result: rejectPathApi(
-      methodName,
-      methodName === 'startDiff' ? 'diffBytes' : 'patchBytes'
-    ),
-    async cancel() {},
-    onProgress() {
-      return () => {};
+    result,
+    async cancel() {
+      controller.abort();
+      await result.catch(() => undefined);
+    },
+    onProgress(listener) {
+      if (typeof listener !== 'function') {
+        throw createError('EINVAL', 'progress listener must be a function');
+      }
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
 }
 
-export function startDiff() {
-  return unsupportedNativeJob('startDiff');
+export function startDiff(oldData, newData, options) {
+  return createBinaryJob('diff', oldData, newData, options);
 }
 
-export function startPatch() {
-  return unsupportedNativeJob('startPatch');
+export function startPatch(oldData, patchData, options) {
+  return createBinaryJob('patch', oldData, patchData, options);
+}
+
+export function startDiffBytes(oldData, newData, options) {
+  return createBinaryJob('diff', oldData, newData, options);
+}
+
+export function startPatchBytes(oldData, patchData, options) {
+  return createBinaryJob('patch', oldData, patchData, options);
 }

@@ -18,14 +18,18 @@
 
 ## 指南
 
+- [Web 与桌面 WebView SDK](./web-sdk.md) — `/web` 与 `/toolkit` ESM 入口、Vite/Tauri
+  资源、生命周期、限制、CSP 与打包检查。
 - [快速开始](/docs/zh-CN/getting-started/) — 安装并完成第一次原生端或 Web 往返。
 - [API 参考](/docs/zh-CN/api-reference/) — 签名、输入、输出和错误码。
 - [生产实践](/docs/zh-CN/recipes/) — 完整性、清理、下载与跨运行时流程。
+- [可验证增量发布工具链](/docs/zh-CN/verified-delta-pipeline/) — Node CLI、
+  manifest、多基线 bundle、发布选择与 GitHub Actions。
 - [平台支持](/docs/zh-CN/platform-support/) — 架构与打包器行为。
 - [架构](/docs/zh-CN/architecture/) — 执行路径与补丁兼容性。
 - [可控制的原生操作](/docs/zh-CN/native-operations-v03/) — 资源限制、取消、进度与
   原子输出约定。
-- [大文件演进路线](/docs/zh-CN/large-files-v04/) — 下一阶段的内存基线、真实进度和
+- [大文件演进路线](/docs/zh-CN/large-files-roadmap/) — 下一阶段的内存基线、真实进度和
   流式能力可行性。
 - [常见问题与排障](/docs/zh-CN/troubleshooting/) — 常见集成失败。
 - [开发与验证](/docs/zh-CN/development/) — 本地构建、测试、WASM 与发布检查。

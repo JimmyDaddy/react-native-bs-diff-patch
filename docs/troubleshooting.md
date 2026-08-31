@@ -69,9 +69,9 @@ Confirm the bundler emits module-worker assets and that the deployed server
 serves `.mjs` files as JavaScript. Strict Content Security Policy deployments
 must permit same-origin workers and WebAssembly execution.
 
-Open the browser network panel and confirm `worker.mjs`, `operations.mjs`, and
-`bsdiffpatch.mjs` are returned with successful status codes rather than the
-application HTML fallback.
+Open the browser network panel and confirm `worker.browser.mjs`,
+`operations.browser.mjs`, and `bsdiffpatch.browser.mjs` are returned with
+successful status codes rather than the application HTML fallback.
 
 ## `EPATCH`, `EWEBASSEMBLY`, or corrupt patch
 

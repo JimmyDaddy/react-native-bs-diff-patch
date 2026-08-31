@@ -65,9 +65,11 @@ output. Existing `diff` and `patch` keep their established behavior.
 
 ## Platform behavior
 
-The job API is available on Android and iOS. React Native Web uses the binary
-`diffBytes` and `patchBytes` APIs with an `AbortSignal` and byte limits instead;
-calling `startDiff` or `startPatch` on Web rejects with `EUNSUPPORTED`.
+Android and iOS jobs accept file paths and resolve to `0`. React Native Web
+jobs accept binary inputs and resolve to `Uint8Array`; `startDiffBytes` and
+`startPatchBytes` are explicit aliases. Web cancellation terminates the job's
+dedicated Worker with `EABORTED`, while progress comes from the same C-core
+checkpoints.
 
 The patch wire format remains `ENDSLEY/BSDIFF43`. Operation control changes
 execution behavior, not patch compatibility.

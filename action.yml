@@ -1,0 +1,50 @@
+name: Verified Delta Patch
+description: Create a verified BSDIFF43 patch and manifest for a release artifact
+author: JimmyDaddy
+
+inputs:
+  old-file:
+    description: Baseline release file
+    required: true
+  new-file:
+    description: Target release file
+    required: true
+  patch-file:
+    description: Output patch path
+    required: false
+    default: update.patch
+  manifest-file:
+    description: Output verified manifest path
+    required: false
+    default: patch-manifest.json
+  max-patch-ratio:
+    description: Full-file fallback threshold between 0 and 1
+    required: false
+    default: '0.85'
+  release-id:
+    description: Optional release identifier stored in the manifest
+    required: false
+
+outputs:
+  strategy:
+    description: patch when the delta is efficient, otherwise full
+  patch-file:
+    description: Generated patch path
+  manifest-file:
+    description: Generated manifest path
+  patch-bytes:
+    description: Generated patch size
+  target-bytes:
+    description: Target file size
+  patch-ratio:
+    description: Patch size divided by target size
+  savings-ratio:
+    description: Transfer ratio saved compared with the full target
+
+runs:
+  using: node24
+  main: action/index.mjs
+
+branding:
+  icon: package
+  color: blue

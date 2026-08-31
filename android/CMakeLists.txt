@@ -7,7 +7,9 @@ set (CMAKE_CXX_STANDARD 11)
 file(GLOB BZIP2_SOURCES "../cpp/bzlib/*.c")
 set(SOURCES
     ../cpp/bsdiff.c
+    ../cpp/bsdiff40_converter.c
     ../cpp/bspatch.c
+    ../cpp/bspatch_streaming.c
     ../cpp/react-native-bs-diff-patch.cpp
     ${BZIP2_SOURCES}
 )

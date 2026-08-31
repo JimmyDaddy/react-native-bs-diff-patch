@@ -48,6 +48,11 @@ TurboModule 实例。
 
 ## React Native Web
 
+独立浏览器和桌面 WebView 应用应导入明确的
+`react-native-bs-diff-patch/web` ESM 入口。它的 Worker 资源图使用不含 Node 分支的
+`web/bsdiffpatch.browser.mjs`；`/toolkit` 入口同样仅支持 ESM。根包的 `browser` 条件
+继续供已有 React Native Web 消费者使用。资源与 CSP 要求见[Web 与桌面 WebView SDK](./web-sdk.md)。
+
 包提供两种 Web 入口机制：
 
 - `browser` 字段让标准浏览器感知型打包器选择 `web/index.mjs`。
@@ -66,13 +71,13 @@ Webpack 与 Vite 能识别标准的
 `new Worker(new URL(..., import.meta.url), { type: 'module' })` 模式。Metro Web
 配置需要在 Web serializer 中保留模块 Worker URL。
 
-Web 入口面向浏览器，不是 Node.js 文件系统适配器；它不会在 Node.js 中提供原生
-文件路径 API。
-原生 job 函数仍会导出以保持统一导入形式，但在 Web 上以 `EUNSUPPORTED` 拒绝。
+Web 入口面向浏览器，不会在浏览器中提供原生文件路径 API。Web 的 `startDiff`、
+`startPatch` 使用二进制输入；单独的 `./node` 包入口提供发布端文件系统操作。
 
 未传 `AbortSignal` 的调用共用模块 Worker 与已初始化的 WebAssembly 模块；带
 signal 的调用使用专用 Worker，保证取消只影响当前任务。两种路径都会在各自 Worker
 内串行执行，但调用方仍应设置应用级内存预算。
+`Blob` 与 `File` 会通过只读 WORKERFS 挂载，避免在主线程生成完整副本。
 `inspectPatch` 不会启动 Worker。`verifyPatch` 先验证元数据，再复用 `patchBytes`
 的 Worker 路径，并在与预期输入比较后丢弃还原缓冲区。
 

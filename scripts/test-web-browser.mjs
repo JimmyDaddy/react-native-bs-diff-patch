@@ -86,16 +86,25 @@ try {
     inputsPreserved: true,
     inputLimitErrorCode: 'ERESOURCE',
     invalidInputErrorCode: 'EINVAL',
+    invalidLimitErrorCode: 'EINVAL',
+    jobProgress: result.jobProgress,
+    jobRestoredMatches: true,
     metadataFormat: 'ENDSLEY/BSDIFF43',
     mismatchVerified: false,
+    nativeOutputLimitErrorCode: 'ERESOURCE',
     outputLimitErrorCode: 'ERESOURCE',
+    overflowLimitErrorCode: 'EINVAL',
     patchLength: result.patchLength,
     pathApiErrorCode: 'EUNSUPPORTED',
     restoredMatches: true,
     sharedSurvivedAbort: true,
+    truthfulProgress: result.truthfulProgress,
     verificationPassed: true,
+    zeroOutputLimitErrorCode: 'ERESOURCE',
   });
   assert.ok(result.patchLength > 24);
+  assert.ok(result.truthfulProgress > 3);
+  assert.ok(result.jobProgress > 3);
   console.log('Browser Web Worker diff/patch round trip passed');
 } finally {
   await browser.close();

@@ -48,8 +48,19 @@ if (result.status !== 0) {
 
 try {
   const bundle = await readFile(bundlePath, 'utf8');
+  const workerSource = await readFile(
+    path.join(repositoryDirectory, 'web/worker.browser.mjs'),
+    'utf8'
+  );
+  const operationsSource = await readFile(
+    path.join(repositoryDirectory, 'web/operations.browser.mjs'),
+    'utf8'
+  );
   assert.match(bundle, /Web Workers are required/);
-  assert.match(bundle, /worker\.mjs/);
+  assert.match(bundle, /worker\.browser\.mjs/);
+  assert.doesNotMatch(bundle, /NODEFS/);
+  assert.match(workerSource, /operations\.browser\.mjs/);
+  assert.match(operationsSource, /bsdiffpatch\.browser\.mjs/);
   assert.doesNotMatch(bundle, /diffBytes is only available on Web/);
   assert.doesNotMatch(bundle, /NativeBsDiffPatch/);
   console.log('Metro selected the React Native Web entry');

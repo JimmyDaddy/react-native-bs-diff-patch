@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="{{META_DESCRIPTION}}" />
+    <meta name="theme-color" content="#060a0d" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="{{PAGE_TITLE}}" />
+    <meta property="og:description" content="{{META_DESCRIPTION}}" />
+    <meta
+      property="og:url"
+      content="https://bs-dff-patch.corerobin.com{{CANONICAL_PATH}}"
+    />
+    <meta
+      property="og:image"
+      content="https://bs-dff-patch.corerobin.com/assets/social-preview.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="canonical"
+      href="https://bs-dff-patch.corerobin.com{{CANONICAL_PATH}}"
+    />
+    <link
+      rel="alternate"
+      hreflang="{{ALTERNATE_LANGUAGE}}"
+      href="https://bs-dff-patch.corerobin.com{{ALTERNATE_PATH}}"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <title>{{PAGE_TITLE}}</title>
+  </head>
+  <body class="tools-body">
+    <a class="skip-link" href="#planner-main">{{SKIP_LABEL}}</a>
+    <div class="page-grid" aria-hidden="true"></div>
+
+    <header class="site-header shell">
+      <a class="brand" href="{{HOME_PATH}}" aria-label="{{HOME_ARIA_LABEL}}">
+        <span class="brand-mark" aria-hidden="true">BΔ</span>
+        <span>react-native-bs-diff-patch</span>
+      </a>
+      <nav class="nav-links" aria-label="{{PRIMARY_NAVIGATION_LABEL}}">
+        <a href="{{HOME_PATH}}">{{HOME_LABEL}}</a>
+        <a href="{{TOOLS_PATH}}">{{TOOLS_LABEL}}</a>
+        <a href="{{CANONICAL_PATH}}" aria-current="page">{{PLANNER_LABEL}}</a>
+        <a href="{{DOCS_PATH}}">{{DOCS_LABEL}}</a>
+        <a
+          class="language-switch"
+          href="{{ALTERNATE_PATH}}"
+          hreflang="{{ALTERNATE_LANGUAGE}}"
+          >{{ALTERNATE_LABEL}}</a
+        >
+        <a
+          class="github-link"
+          href="https://github.com/JimmyDaddy/react-native-bs-diff-patch"
+          rel="noreferrer"
+        >
+          <span class="status-dot" aria-hidden="true"></span>
+          GitHub
+        </a>
+      </nav>
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="{{PRIMARY_NAVIGATION_LABEL}}"
+        data-closed-label="{{MENU_LABEL}}"
+        data-open-label="{{CLOSE_LABEL}}"
+      >
+        {{MENU_LABEL}}
+      </button>
+    </header>
+
+    <main id="planner-main" class="tools-main shell">
+      <section class="planner-hero">
+        <div>
+          <p class="section-kicker">
+            <span class="lang-en">Verified Delta Pipeline</span>
+            <span class="lang-zh">可验证增量发布工具链</span>
+          </p>
+          <h1>
+            <span class="lang-en"
+              >Plan one release.<br /><span class="headline-accent"
+                >Serve every baseline.</span
+              ></span
+            >
+            <span class="lang-zh"
+              >规划一次发布。<br /><span class="headline-accent"
+                >覆盖每个基线。</span
+              ></span
+            >
+          </h1>
+          <p class="tools-lede lang-en">
+            Build a patch matrix from multiple old releases to one target. Keep
+            efficient deltas, fall back to the full file, and export a verified
+            CDN manifest.
+          </p>
+          <p class="tools-lede lang-zh">
+            从多个旧版本到同一个目标生成补丁矩阵。保留高效差量，在补丁不划算时回退完整文件，
+            并导出可验证的 CDN manifest。
+          </p>
+        </div>
+        <aside class="privacy-card">
+          <span class="privacy-icon" aria-hidden="true">LOCAL</span>
+          <div>
+            <strong class="lang-en">Release artifacts stay local</strong>
+            <strong class="lang-zh">发布产物始终保留在本地</strong>
+            <p class="lang-en">
+              Planning runs in a Web Worker. Nothing is uploaded or stored by
+              this site.
+            </p>
+            <p class="lang-zh">
+              规划过程在 Web Worker 中执行，网站不会上传或存储任何文件。
+            </p>
+          </div>
+          <span
+            id="planner-runtime-state"
+            class="runtime-state"
+            data-state="loading"
+            >{{RUNTIME_LOADING}}</span
+          >
+        </aside>
+      </section>
+
+      <section class="planner-workspace" aria-labelledby="planner-title">
+        <header class="planner-heading">
+          <div>
+            <p class="section-kicker">Release Planner</p>
+            <h2 id="planner-title">
+              <span class="lang-en">Create a multi-baseline patch matrix</span>
+              <span class="lang-zh">生成多基线补丁矩阵</span>
+            </h2>
+          </div>
+          <p class="lang-en">
+            Browser memory still limits input size. Start with representative
+            release artifacts and reproduce production bundles with the CLI.
+          </p>
+          <p class="lang-zh">
+            浏览器内存仍会限制输入规模。可先用代表性发布产物评估，再通过 CLI
+            复现生产 bundle。
+          </p>
+        </header>
+
+        <div class="planner-form">
+          <div class="planner-files">
+            <label class="file-drop" data-file-drop for="planner-target-file">
+              <input id="planner-target-file" type="file" />
+              <span class="file-drop-number">01</span>
+              <span class="file-drop-copy">
+                <strong class="lang-en">Target release</strong>
+                <strong class="lang-zh">目标版本</strong>
+                <span class="lang-en">The full-file fallback artifact</span>
+                <span class="lang-zh">同时作为完整文件回退产物</span>
+              </span>
+              <output data-file-summary="planner-target-file"
+                >{{NO_FILE_LABEL}}</output
+              >
+            </label>
+            <label
+              class="file-drop"
+              data-file-drop
+              for="planner-baseline-files"
+            >
+              <input id="planner-baseline-files" type="file" multiple />
+              <span class="file-drop-number">02</span>
+              <span class="file-drop-copy">
+                <strong class="lang-en">Baseline releases</strong>
+                <strong class="lang-zh">基线版本</strong>
+                <span class="lang-en">Choose two or more old artifacts</span>
+                <span class="lang-zh">选择两个或更多旧版本产物</span>
+              </span>
+              <output data-file-summary="planner-baseline-files"
+                >{{NO_FILE_LABEL}}</output
+              >
+            </label>
+          </div>
+
+          <div class="planner-options">
+            <label>
+              <span class="lang-en">Maximum patch ratio</span>
+              <span class="lang-zh">最大补丁比例</span>
+              <input
+                id="planner-max-ratio"
+                type="number"
+                min="0"
+                max="1"
+                step="0.05"
+                value="0.85"
+              />
+            </label>
+            <label>
+              <span class="lang-en">Release ID (optional)</span>
+              <span class="lang-zh">发布 ID（可选）</span>
+              <input id="planner-release-id" type="text" placeholder="v1.5.0" />
+            </label>
+          </div>
+
+          <div class="tool-actions">
+            <button id="planner-run" class="primary-button" type="button">
+              <span class="lang-en">Build release plan</span>
+              <span class="lang-zh">生成发布计划</span>
+            </button>
+            <button
+              id="planner-cancel"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <span class="lang-en">Cancel</span>
+              <span class="lang-zh">取消</span>
+            </button>
+            <button id="planner-reset" class="secondary-button" type="button">
+              <span class="lang-en">Reset</span>
+              <span class="lang-zh">重置</span>
+            </button>
+          </div>
+          <p id="planner-status" class="tool-status" data-state="idle">
+            {{READY_LABEL}}
+          </p>
+        </div>
+
+        <section
+          id="planner-results"
+          class="planner-results"
+          aria-live="polite"
+        >
+          <div class="planner-summary">
+            <div>
+              <span class="lang-en">Baselines</span>
+              <span class="lang-zh">基线数</span>
+              <strong id="planner-baseline-count">0</strong>
+            </div>
+            <div>
+              <span class="lang-en">Delta routes</span>
+              <span class="lang-zh">差量路径</span>
+              <strong id="planner-patch-count">0</strong>
+            </div>
+            <div>
+              <span class="lang-en">Full fallbacks</span>
+              <span class="lang-zh">完整文件回退</span>
+              <strong id="planner-fallback-count">0</strong>
+            </div>
+            <div>
+              <span class="lang-en">Estimated transfer saved</span>
+              <span class="lang-zh">预计节省传输</span>
+              <strong id="planner-savings">—</strong>
+            </div>
+          </div>
+          <div class="planner-table-wrap">
+            <table class="planner-table">
+              <thead>
+                <tr>
+                  <th class="lang-en">Baseline</th>
+                  <th class="lang-zh">基线</th>
+                  <th>SHA-256</th>
+                  <th class="lang-en">Patch</th>
+                  <th class="lang-zh">补丁</th>
+                  <th class="lang-en">Ratio</th>
+                  <th class="lang-zh">比例</th>
+                  <th class="lang-en">Decision</th>
+                  <th class="lang-zh">决策</th>
+                  <th class="lang-en">Artifact</th>
+                  <th class="lang-zh">产物</th>
+                </tr>
+              </thead>
+              <tbody id="planner-matrix">
+                <tr>
+                  <td colspan="6">{{REPORT_EMPTY}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="result-actions">
+            <button
+              id="planner-download-manifest"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <span class="lang-en">Download bundle manifest</span>
+              <span class="lang-zh">下载 bundle manifest</span>
+            </button>
+            <button
+              id="planner-copy-report"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <span class="lang-en">Copy release report</span>
+              <span class="lang-zh">复制发布报告</span>
+            </button>
+          </div>
+        </section>
+      </section>
+
+      <section class="planner-automation" aria-labelledby="automation-title">
+        <div>
+          <p class="section-kicker">
+            <span class="lang-en">Reproduce in CI/CD</span>
+            <span class="lang-zh">在 CI/CD 中复现</span>
+          </p>
+          <h2 id="automation-title">
+            <span class="lang-en">The browser plans. The CLI ships.</span>
+            <span class="lang-zh">浏览器负责规划，CLI 负责交付。</span>
+          </h2>
+          <p class="lang-en">
+            Use the exact same bundle schema in release jobs, GitHub Releases,
+            or your CDN pipeline.
+          </p>
+          <p class="lang-zh">
+            在发布任务、GitHub Releases 或 CDN 流程中使用完全相同的 bundle
+            schema。
+          </p>
+        </div>
+        <div class="planner-code-grid">
+          <article>
+            <header><span>CLI</span><code>release.sh</code></header>
+            <pre><code>npx react-native-bs-diff-patch bundle \
+  --from releases/ \
+  --to dist/app.bin \
+  --out dist/update-bundle \
+  --max-ratio 0.85</code></pre>
+          </article>
+          <article>
+            <header><span>GitHub Action</span><code>release.yml</code></header>
+            <pre><code>- uses: JimmyDaddy/react-native-bs-diff-patch@v0.5.0
+  id: delta
+  with:
+    old-file: releases/v1.bin
+    new-file: dist/app.bin
+    patch-file: dist/update.patch
+    manifest-file: dist/patch-manifest.json</code></pre>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer shell">
+      <div class="brand footer-brand">
+        <span class="brand-mark" aria-hidden="true">BΔ</span>
+        <span>react-native-bs-diff-patch</span>
+      </div>
+      <p>{{FOOTER_TEXT}}</p>
+      <nav aria-label="{{FOOTER_NAVIGATION_LABEL}}">
+        <a href="{{HOME_PATH}}">{{HOME_LABEL}}</a>
+        <a href="{{TOOLS_PATH}}">{{TOOLS_LABEL}}</a>
+        <a href="{{DOCS_PATH}}">{{DOCS_LABEL}}</a>
+        <a href="https://www.npmjs.com/package/react-native-bs-diff-patch"
+          >npm</a
+        >
+      </nav>
+    </footer>
+
+    <script type="module" src="/assets/planner.js"></script>
+    <script src="/assets/site.js" defer></script>
+  </body>
+</html>

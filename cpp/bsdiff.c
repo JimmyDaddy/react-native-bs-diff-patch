@@ -454,7 +454,7 @@ static int input_limit_result(
     const struct bs_operation_options *options,
     int64_t size)
 {
-    if (options != NULL && options->max_input_bytes > 0 &&
+    if (bs_operation_has_input_limit(options) &&
         size > options->max_input_bytes)
         return BS_OPERATION_INPUT_TOO_LARGE;
     return BS_OPERATION_OK;
@@ -520,7 +520,7 @@ static int bz2_write(struct bsdiff_stream *stream, const void *buffer, int size)
         return -1;
     }
 
-    if (context->options != NULL && context->options->max_output_bytes > 0) {
+    if (bs_operation_has_output_limit(context->options)) {
         long position = ftell(context->file);
         if (position >= 0 && position > context->options->max_output_bytes) {
             context->result = BS_OPERATION_OUTPUT_TOO_LARGE;
@@ -568,6 +568,11 @@ static int bsDiffFileInternal(
         goto cleanup;
     if (operation_cancelled(options)) {
         result = BS_OPERATION_CANCELLED;
+        goto cleanup;
+    }
+    if (bs_operation_has_output_limit(options) &&
+        options->max_output_bytes < 24) {
+        result = BS_OPERATION_OUTPUT_TOO_LARGE;
         goto cleanup;
     }
 
@@ -620,12 +625,6 @@ static int bsDiffFileInternal(
         goto cleanup;
     operation_progress(options, BS_OPERATION_READING, 0.15);
 
-    if (options != NULL && options->max_output_bytes > 0 &&
-        options->max_output_bytes < 24) {
-        result = BS_OPERATION_OUTPUT_TOO_LARGE;
-        goto cleanup;
-    }
-
     errorStage = "open-output";
     fd = outputFd >= 0 ? outputFd : open(patchFile, O_CREAT|O_EXCL|O_WRONLY, 0666);
     outputFd = -1;
@@ -665,7 +664,7 @@ static int bsDiffFileInternal(
     context.bz2 = NULL;
     if (bz2err != BZ_OK)
         goto cleanup;
-    if (options != NULL && options->max_output_bytes > 0) {
+    if (bs_operation_has_output_limit(options)) {
         long position = ftell(pf);
         if (position < 0 || position > options->max_output_bytes) {
             result = BS_OPERATION_OUTPUT_TOO_LARGE;

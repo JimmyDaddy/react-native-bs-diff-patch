@@ -18,6 +18,9 @@ const temporaryDirectory = await mkdtemp(
   path.join(os.tmpdir(), 'react-native-bs-diff-patch-consumer-')
 );
 const consumerDirectory = path.join(temporaryDirectory, 'consumer');
+const suppliedTarball = process.env.PACKAGE_TARBALL
+  ? path.resolve(process.env.PACKAGE_TARBALL)
+  : undefined;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -100,18 +103,25 @@ async function pathExists(candidate) {
 }
 
 try {
-  const packOutput = normalizePackEntries(
-    parseTrailingJson(
-      run('npm', [
-        'pack',
-        '--ignore-scripts',
-        '--json',
-        '--pack-destination',
+  if (suppliedTarball) {
+    await access(suppliedTarball);
+  }
+  const tarballPath = suppliedTarball
+    ? suppliedTarball
+    : path.join(
         temporaryDirectory,
-      ])
-    )
-  );
-  const tarballPath = path.join(temporaryDirectory, packOutput[0].filename);
+        normalizePackEntries(
+          parseTrailingJson(
+            run('npm', [
+              'pack',
+              '--ignore-scripts',
+              '--json',
+              '--pack-destination',
+              temporaryDirectory,
+            ])
+          )
+        )[0].filename
+      );
 
   await mkdir(consumerDirectory, { recursive: true });
   await writeFile(
@@ -122,18 +132,9 @@ try {
       2
     )}\n`
   );
-  run(
-    'npm',
-    [
-      'install',
-      tarballPath,
-      '--ignore-scripts',
-      '--no-audit',
-      '--no-fund',
-      '--package-lock=false',
-    ],
-    { cwd: consumerDirectory }
-  );
+  run('npm', ['install', tarballPath, '--no-audit', '--no-fund'], {
+    cwd: consumerDirectory,
+  });
 
   assert.equal(
     await pathExists(path.join(consumerDirectory, 'node_modules/react')),
@@ -144,6 +145,16 @@ try {
     await pathExists(path.join(consumerDirectory, 'node_modules/react-native')),
     false,
     'A browser-only install must not auto-install the optional React Native peer'
+  );
+  const dependencyTree = JSON.parse(
+    run('npm', ['ls', '--omit=dev', '--all', '--json'], {
+      cwd: consumerDirectory,
+    })
+  );
+  assert.equal(
+    Object.hasOwn(dependencyTree.dependencies || {}, 'react-native'),
+    false,
+    'The packed browser consumer dependency tree must not contain React Native'
   );
 
   const fakeReactNativeDirectory = path.join(
@@ -183,6 +194,23 @@ try {
   );
   assert.equal(installedManifest.exports['.'].browser, './web/index.mjs');
   assert.equal(
+    installedManifest.exports['.'].types.browser,
+    './web/index.d.mts'
+  );
+  assert.equal(installedManifest.exports['./web'].import, './web/index.mjs');
+  assert.equal(installedManifest.exports['./web'].types, './web/index.d.mts');
+  assert.equal(installedManifest.exports['./node'].node, './node/index.mjs');
+  assert.equal(
+    installedManifest.exports['./toolkit'].import,
+    './toolkit/index.mjs'
+  );
+  assert.equal(
+    typeof installedManifest.bin === 'string'
+      ? installedManifest.bin
+      : installedManifest.bin['react-native-bs-diff-patch'],
+    './bin/react-native-bs-diff-patch.mjs'
+  );
+  assert.equal(
     installedManifest.exports['.']['react-native'],
     './src/index.ts'
   );
@@ -203,6 +231,14 @@ try {
   assert.match(
     run('node', ['resolve.mjs'], { cwd: consumerDirectory }),
     /lib\/module\/index\.js$/
+  );
+  await writeFile(
+    path.join(consumerDirectory, 'resolve-web.mjs'),
+    "console.log(import.meta.resolve('react-native-bs-diff-patch/web'));\n"
+  );
+  assert.match(
+    run('node', ['resolve-web.mjs'], { cwd: consumerDirectory }),
+    /web\/index\.mjs$/
   );
 
   await writeFile(
@@ -244,13 +280,79 @@ try {
   });
 
   await writeFile(
+    path.join(consumerDirectory, 'web.mjs'),
+    [
+      "import { diffBytes, inspectPatch, startDiffBytes } from 'react-native-bs-diff-patch/web';",
+      "if (typeof diffBytes !== 'function' || typeof inspectPatch !== 'function' || typeof startDiffBytes !== 'function') throw new Error('Missing explicit Web API');",
+    ].join('\n')
+  );
+  run('node', ['web.mjs'], { cwd: consumerDirectory });
+
+  await writeFile(
+    path.join(consumerDirectory, 'pipeline.mjs'),
+    [
+      "import { inspectPatchFile } from 'react-native-bs-diff-patch/node';",
+      "import { canonicalJson, createPatchManifest } from 'react-native-bs-diff-patch/toolkit';",
+      "if (typeof inspectPatchFile !== 'function') throw new Error('Missing Node API');",
+      'if (canonicalJson({ b: 1, a: 2 }) !== \'{"a":2,"b":1}\') throw new Error(\'Toolkit mismatch\');',
+      "if (createPatchManifest({ baseline: { bytes: 1, sha256: '1'.repeat(64) }, patch: { bytes: 1, sha256: '2'.repeat(64) }, target: { bytes: 1, sha256: '3'.repeat(64) } }).version !== 1) throw new Error('Manifest mismatch');",
+    ].join('\n')
+  );
+  run('node', ['pipeline.mjs'], { cwd: consumerDirectory });
+  const installedCliPath = path.join(
+    installedPackageDirectory,
+    'bin/react-native-bs-diff-patch.mjs'
+  );
+  const oldArtifactPath = path.join(consumerDirectory, 'old.bin');
+  const newArtifactPath = path.join(consumerDirectory, 'new.bin');
+  const patchArtifactPath = path.join(consumerDirectory, 'update.patch');
+  await Promise.all([
+    writeFile(oldArtifactPath, 'packed old artifact\n'.repeat(32)),
+    writeFile(newArtifactPath, 'packed new artifact\n'.repeat(32)),
+  ]);
+  run(
+    'node',
+    [
+      installedCliPath,
+      'diff',
+      oldArtifactPath,
+      newArtifactPath,
+      '-o',
+      patchArtifactPath,
+    ],
+    { cwd: consumerDirectory }
+  );
+  run(
+    'node',
+    [
+      installedCliPath,
+      'verify',
+      oldArtifactPath,
+      patchArtifactPath,
+      newArtifactPath,
+    ],
+    { cwd: consumerDirectory }
+  );
+
+  await writeFile(
     path.join(consumerDirectory, 'consumer.ts'),
     [
       "import { diffBytes, inspectPatch, verifyPatch, type BinaryInput, type PatchMetadata } from 'react-native-bs-diff-patch';",
+      "import { startDiff as startWebDiff, type BinaryOperationJob } from 'react-native-bs-diff-patch/web';",
+      "import { inspectPatchFile, type NodeOperationResult } from 'react-native-bs-diff-patch/node';",
+      "import { createPatchManifest, type PatchManifest } from 'react-native-bs-diff-patch/toolkit';",
       'const input: BinaryInput = new Uint8Array([1, 2, 3]);',
       'void diffBytes(input, input);',
       'void inspectPatch(input).then((value: PatchMetadata) => value.valid);',
       'void verifyPatch(input, input, input).then((value) => value.verified);',
+      'void inspectPatchFile("update.patch").then((value) => value.valid);',
+      'const manifest: PatchManifest = createPatchManifest({ baseline: { bytes: 1, sha256: "1".repeat(64) }, patch: { bytes: 1, sha256: "2".repeat(64) }, target: { bytes: 1, sha256: "3".repeat(64) } });',
+      'const result: NodeOperationResult | undefined = undefined;',
+      'const job: BinaryOperationJob = startWebDiff(input, input);',
+      'const jobResult: Promise<Uint8Array> = job.result;',
+      '// @ts-expect-error Explicit Web types must reject native path arguments.',
+      'startWebDiff("old", "new", "patch");',
+      'void manifest; void result; void jobResult;',
     ].join('\n')
   );
   run(
@@ -259,6 +361,8 @@ try {
       path.join(repositoryDirectory, 'node_modules/typescript/bin/tsc'),
       '--noEmit',
       '--strict',
+      '--skipLibCheck',
+      'false',
       '--target',
       'ES2022',
       '--module',

@@ -62,8 +62,8 @@
 确认打包器输出了模块 Worker 资源，并且服务器将 `.mjs` 作为 JavaScript 提供。
 严格 CSP 需要允许同源 Worker 和 WebAssembly 执行。
 
-在浏览器网络面板中确认 `worker.mjs`、`operations.mjs` 和 `bsdiffpatch.mjs`
-返回成功状态，而不是应用 HTML fallback。
+在浏览器网络面板中确认 `worker.browser.mjs`、`operations.browser.mjs` 和
+`bsdiffpatch.browser.mjs` 返回成功状态，而不是应用 HTML fallback。
 
 ## `EPATCH`、`EWEBASSEMBLY` 或补丁损坏
 

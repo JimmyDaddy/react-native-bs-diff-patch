@@ -18,14 +18,19 @@ The [Chinese documentation](./zh-CN/README.md) mirrors the same public guides.
 
 ## Guides
 
+- [Web and desktop WebView SDK](./web-sdk.md) — explicit ESM `/web` and
+  `/toolkit` entries, Vite/Tauri resources, lifecycle, limits, CSP, and
+  packaging checks.
 - [Getting started](./getting-started.md) — installation and a first native or Web round trip.
 - [API reference](./api-reference.md) — signatures, inputs, outputs, and errors.
 - [Production recipes](./recipes.md) — integrity, cleanup, downloads, and cross-runtime workflows.
+- [Verified Delta Pipeline](./verified-delta-pipeline.md) — Node CLI,
+  manifests, multi-baseline bundles, release selection, and GitHub Actions.
 - [Platform support](./platform-support.md) — architecture and bundler behavior.
 - [Architecture](./architecture.md) — execution paths and patch compatibility.
 - [Controllable native operations](./native-operations-v03.md) — resource limits,
   cancellation, progress, and atomic output contract.
-- [Large-file roadmap](./large-files-v04.md) — memory baselines, honest progress,
+- [Large-file roadmap](./large-files-roadmap.md) — memory baselines, honest progress,
   and streaming feasibility for the next architecture iteration.
 - [Troubleshooting](./troubleshooting.md) — common integration failures.
 - [Development](./development.md) — local builds, tests, WebAssembly, and release checks.

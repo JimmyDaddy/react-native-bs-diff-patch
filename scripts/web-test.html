@@ -16,6 +16,8 @@
         diffBytes,
         inspectPatch,
         patchBytes,
+        startDiff,
+        startPatchBytes,
         verifyPatch,
       } from '../web/index.mjs';
 
@@ -26,9 +28,15 @@
       const newData = encoder.encode(
         'new browser data\n'.repeat(96) + 'worker round trip\n'.repeat(32)
       );
+      const newDataSnapshot = newData.slice();
+      const oldBufferBytes = oldData.buffer.byteLength;
+      const newBufferBytes = newData.buffer.byteLength;
 
       try {
-        const patchData = await diffBytes(new Blob([oldData]), newData);
+        const progressEvents = [];
+        const patchData = await diffBytes(new Blob([oldData]), newData, {
+          onProgress: (event) => progressEvents.push(event),
+        });
         const restoredData = await patchBytes(oldData.buffer, patchData);
         const metadata = await inspectPatch(patchData);
         const verification = await verifyPatch(oldData, patchData, newData);
@@ -40,9 +48,11 @@
         const restoredMatches =
           restoredData.length === newData.length &&
           restoredData.every((value, index) => value === newData[index]);
-        const inputsPreserved = oldData.every(
-          (value, index) => value === oldDataSnapshot[index]
-        );
+        const inputsPreserved =
+          oldData.buffer.byteLength === oldBufferBytes &&
+          newData.buffer.byteLength === newBufferBytes &&
+          oldData.every((value, index) => value === oldDataSnapshot[index]) &&
+          newData.every((value, index) => value === newDataSnapshot[index]);
 
         let pathApiErrorCode;
         try {
@@ -74,6 +84,36 @@
           outputLimitErrorCode = error.code;
         }
 
+        let zeroOutputLimitErrorCode;
+        try {
+          await diffBytes(oldData, newData, { maxOutputBytes: 0 });
+        } catch (error) {
+          zeroOutputLimitErrorCode = error.code;
+        }
+
+        let nativeOutputLimitErrorCode;
+        try {
+          await diffBytes(oldData, newData, { maxOutputBytes: 24 });
+        } catch (error) {
+          nativeOutputLimitErrorCode = error.code;
+        }
+
+        let invalidLimitErrorCode;
+        try {
+          await diffBytes(oldData, newData, { maxInputBytes: -1 });
+        } catch (error) {
+          invalidLimitErrorCode = error.code;
+        }
+
+        let overflowLimitErrorCode;
+        try {
+          await diffBytes(oldData, newData, {
+            maxOutputBytes: Number.MAX_SAFE_INTEGER + 1,
+          });
+        } catch (error) {
+          overflowLimitErrorCode = error.code;
+        }
+
         const abortController = new AbortController();
         abortController.abort();
         let abortErrorCode;
@@ -85,20 +125,28 @@
           abortErrorCode = error.code;
         }
 
-        const activeAbortController = new AbortController();
         const activeOldData = new Uint8Array(4 * 1024 * 1024);
         const activeNewData = activeOldData.slice();
         activeNewData[activeNewData.length - 1] = 1;
-        const activeOperation = diffBytes(activeOldData, activeNewData, {
-          signal: activeAbortController.signal,
-        });
-        setTimeout(() => activeAbortController.abort(), 20);
+        const activeJob = startDiff(activeOldData, activeNewData);
+        setTimeout(() => activeJob.cancel(), 20);
         let activeAbortErrorCode;
         try {
-          await activeOperation;
+          await activeJob.result;
         } catch (error) {
           activeAbortErrorCode = error.code;
         }
+
+        const patchJob = startPatchBytes(oldData, patchData);
+        const jobProgressEvents = [];
+        const unsubscribe = patchJob.onProgress((event) =>
+          jobProgressEvents.push(event)
+        );
+        const jobRestoredData = await patchJob.result;
+        unsubscribe();
+        const jobRestoredMatches =
+          jobRestoredData.length === newData.length &&
+          jobRestoredData.every((value, index) => value === newData[index]);
 
         const afterAbortData = await patchBytes(oldData, patchData);
         const sharedSurvivedAbort =
@@ -112,10 +160,22 @@
           abortErrorCode !== 'EABORTED' ||
           inputLimitErrorCode !== 'ERESOURCE' ||
           invalidInputErrorCode !== 'EINVAL' ||
+          invalidLimitErrorCode !== 'EINVAL' ||
+          nativeOutputLimitErrorCode !== 'ERESOURCE' ||
+          overflowLimitErrorCode !== 'EINVAL' ||
           outputLimitErrorCode !== 'ERESOURCE' ||
+          zeroOutputLimitErrorCode !== 'ERESOURCE' ||
           pathApiErrorCode !== 'EUNSUPPORTED' ||
           metadata.format !== 'ENDSLEY/BSDIFF43' ||
           metadata.declaredTargetBytes !== String(newData.byteLength) ||
+          !progressEvents.some(
+            (event) => event.phase === 'processing' && event.progress > 0
+          ) ||
+          progressEvents.at(-1)?.phase !== 'writing' ||
+          progressEvents.at(-1)?.progress !== 1 ||
+          !jobProgressEvents.every((event) => event.id === patchJob.id) ||
+          !jobProgressEvents.some((event) => event.phase === 'processing') ||
+          !jobRestoredMatches ||
           !verification.verified ||
           mismatch.verified ||
           !sharedSurvivedAbort
@@ -129,12 +189,19 @@
           inputsPreserved,
           inputLimitErrorCode,
           invalidInputErrorCode,
+          invalidLimitErrorCode,
           metadataFormat: metadata.format,
+          nativeOutputLimitErrorCode,
+          jobProgress: jobProgressEvents.length,
+          jobRestoredMatches,
           mismatchVerified: mismatch.verified,
           outputLimitErrorCode,
+          overflowLimitErrorCode,
           patchLength: patchData.length,
           pathApiErrorCode,
           restoredMatches,
+          truthfulProgress: progressEvents.length,
+          zeroOutputLimitErrorCode,
           sharedSurvivedAbort,
           verificationPassed: verification.verified,
         };

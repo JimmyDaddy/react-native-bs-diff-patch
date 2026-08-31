@@ -5,6 +5,7 @@ import {
   inspectPatch as inspectPatchMetadata,
   patchBytes,
 } from '../web/index.mjs';
+import { createPatchManifest } from '../toolkit/index.mjs';
 
 const PATCH_MAGIC = 'ENDSLEY/BSDIFF43';
 const INSPECTOR_MAX_BYTES = 256 * 1024 * 1024;
@@ -813,34 +814,24 @@ async function generateManifest() {
       sha256(newFile),
       sha256(patchData),
     ]);
-    const savedBytes = newFile.size - patchFile.size;
-    const savingRatio =
-      newFile.size === 0 ? 0 : (savedBytes / newFile.size) * 100;
     currentManifestJson = `${JSON.stringify(
-      {
-        manifestVersion: 1,
-        patchFormat: PATCH_MAGIC,
+      createPatchManifest({
         baseline: {
-          filename: oldFile.name,
           bytes: oldFile.size,
+          name: oldFile.name,
           sha256: oldHash,
         },
         target: {
-          filename: newFile.name,
           bytes: newFile.size,
+          name: newFile.name,
           sha256: newHash,
         },
         patch: {
-          filename: patchFile.name,
           bytes: patchFile.size,
+          name: patchFile.name,
           sha256: patchHash,
-          declaredTargetBytes: metadata.declaredTargetBytes,
         },
-        transfer: {
-          savedBytes,
-          savingRatioPercent: Number(savingRatio.toFixed(4)),
-        },
-      },
+      }),
       null,
       2
     )}\n`;

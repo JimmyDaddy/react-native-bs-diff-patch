@@ -72,7 +72,13 @@ Web implementation changes should also pass:
 yarn test:web
 yarn test:web:browser
 yarn test:web:metro
+yarn test:sdk
 ```
+
+`test:sdk` installs the prepared package tarball into an isolated consumer and
+checks the public `/web` and `/toolkit` ESM entries, the production Vite
+resource graph, and real byte round trips. It does not use a workspace link or
+the registry's older package.
 
 Documentation and site changes should pass:
 
@@ -119,11 +125,28 @@ Maintainers should run the quality gates, then create the release:
 
 ```sh
 yarn prepare
+yarn test:sdk
 yarn typecheck
 yarn lint
 yarn test --runInBand
-yarn release
+yarn pack --dry-run
+yarn release --no-increment
 ```
+
+`yarn prepare` runs the React Native Builder Bob output step, package
+preparation, and `scripts/check-package-contract.mjs`. The same contract check
+runs from the `prepack` lifecycle before a tarball is created. Run
+`node scripts/check-package-contract.mjs` directly when inspecting a prepared
+tree without rebuilding it. `yarn build:web` produces separate Node and
+browser/Worker WASM modules: `web/bsdiffpatch.mjs` keeps NODEFS for Node and
+the CLI, while `web/bsdiffpatch.browser.mjs` is the Node-free browser build.
+
+When `package.json` already contains the prepared version, use
+`yarn release --no-increment` so release-it does not bump it again. This command
+creates the release commit, tag, and GitHub Release; the GitHub Release then
+triggers the npm workflow. Run it only with explicit maintainer authorization.
+A local 0.5.0 tarball is not a registry release; do not describe it as
+published until the GitHub Release and npm provenance checks have completed.
 
 The npm package already trusts the `JimmyDaddy/react-native-bs-diff-patch`
 repository and the `npm-publish.yml` workflow. No npm-side configuration is
@@ -145,6 +168,10 @@ The `package.json` file contains various scripts for common tasks:
 - `yarn test:web`: verify the WebAssembly patch format and round trip.
 - `yarn test:web:browser`: exercise the public Web Worker API in Chrome.
 - `yarn test:web:metro`: verify Metro resolves the React Native Web entry.
+- `yarn test:sdk`: install the prepared tarball and verify `/web` and `/toolkit`
+  from an isolated Vite consumer.
+- `node scripts/check-package-contract.mjs`: verify exports, declarations,
+  packed assets, and the Node-free browser resource graph.
 - `yarn site:build`: render public Markdown and static site assets into `site-dist/`.
 - `yarn site:test`: validate site structure and local links.
 - `yarn site:test:browser`: verify the live Playground, docs, and mobile viewport.

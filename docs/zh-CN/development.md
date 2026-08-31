@@ -34,6 +34,7 @@ yarn test:web
 yarn test:web:browser
 yarn test:web:metro
 yarn test:package
+yarn test:sdk
 ```
 
 - `test:web` 检查 WebAssembly 往返和补丁 magic。
@@ -41,6 +42,8 @@ yarn test:package
 - `test:web:metro` 证明 Metro 选择 `.web` 入口，而不是原生 TurboModule facade。
 - `test:package` 将真实 tarball 安装到干净消费者，验证 browser、ESM、CommonJS、
   TypeScript 与可选 peer 行为。
+- `test:sdk` 将准备好的 tarball 安装到隔离 Vite 消费者，验证明确的 `/web` 与
+  `/toolkit` ESM 入口、生产资源加载和真实字节往返。
 
 ## 原生健壮性与兼容性
 
@@ -82,7 +85,7 @@ BENCHMARK_OUTPUT=/tmp/native-large.json yarn benchmark:large:native
 
 大文件 profiling 使用 16、64、128 MiB fixture，可能消耗数 GiB 内存，因此不会作为
 pull request 门禁。手动运行 `Native Core Benchmark` 时可以传入逗号分隔的尺寸列表，
-以获得共享 Runner 基线。解读结果时应遵循[大文件演进路线](/docs/zh-CN/large-files-v04/)
+以获得共享 Runner 基线。解读结果时应遵循[大文件演进路线](/docs/zh-CN/large-files-roadmap/)
 中的范围和验收标准。
 
 发布包 canary 会直接从 npm 安装，并有意使用当前 Vite 与 Expo 工具链；它们是定时
@@ -126,7 +129,10 @@ yarn test:web
 yarn test:web:browser
 ```
 
-将重新生成的 `web/bsdiffpatch.mjs` 与 C 源码改动一起提交。
+将两个重新生成的模块与 C 源码改动一起提交。Node 兼容的
+`web/bsdiffpatch.mjs` 为 `/node` 和 CLI 保留 NODEFS；专用浏览器
+`web/bsdiffpatch.browser.mjs` 为 `/web` Worker 图排除 Node runtime 分支。不要为了
+隐藏打包器警告而互相替换两者。
 
 ## 原生验证
 
@@ -144,10 +150,13 @@ RN 0.86 新架构；React Native 0.82 及以上已不再提供旧架构运行时
 ## 发布检查清单
 
 1. 执行核心、Web 和站点门禁。
-2. 运行 `yarn test:package`，并检查 `npm pack --dry-run --ignore-scripts`。
+2. 运行 `yarn test:package`、`yarn test:sdk`，并检查 `npm pack --dry-run`。
+   pack 命令会运行 `prepack` contract 检查；也可直接运行
+   `node scripts/check-package-contract.mjs`。
 3. 确认公开文档与导出的 TypeScript 声明一致。
 4. 确认中英文指南描述同一套公开行为。
-5. 运行 `yarn release` 创建版本、tag 和 GitHub Release；该命令不直接发布 npm。
+5. 准备好的 `package.json` 版本确定后，使用 `yarn release --no-increment` 创建
+   release commit、tag 和 GitHub Release；仅在维护者明确授权时运行。
 6. GitHub Release 发布后会触发 `npm-publish.yml`。工作流校验 tag 与
    `package.json` 版本一致，执行发布门禁，通过 npm Trusted Publishing 发布，
    并验证 provenance 证明。

@@ -11,6 +11,23 @@ export interface BinaryOperationOptions {
   maxInputBytes?: number;
   /** Reject when the generated or restored output exceeds this number of bytes. */
   maxOutputBytes?: number;
+  /** Observe real C-core checkpoints on Web. */
+  onProgress?: (event: BinaryOperationProgress) => void;
+}
+
+export interface BinaryOperationProgress {
+  operation: 'diff' | 'patch';
+  phase: 'reading' | 'processing' | 'writing';
+  progress: number;
+}
+
+export interface BinaryOperationJob {
+  id: string;
+  result: Promise<Uint8Array>;
+  cancel(): Promise<void>;
+  onProgress(
+    listener: (event: BinaryOperationProgress & { id: string }) => void
+  ): () => void;
 }
 
 export interface NativeOperationOptions {
@@ -63,6 +80,56 @@ export interface PatchVerificationResult {
   restoredBytes: number;
   expectedBytes: number;
   patch: PatchMetadata;
+}
+
+export type PatchErrorCategory =
+  | 'ABORTED'
+  | 'RESOURCE'
+  | 'INVALID_ARGUMENT'
+  | 'INVALID_PATCH'
+  | 'VERIFICATION'
+  | 'DESTINATION'
+  | 'UNSUPPORTED'
+  | 'RUNTIME';
+
+export interface ClassifiedPatchError {
+  category: PatchErrorCategory;
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+const ERROR_CATEGORIES: Record<string, PatchErrorCategory> = {
+  EABORTED: 'ABORTED',
+  ECANCELLED: 'ABORTED',
+  ERESOURCE: 'RESOURCE',
+  EINPUT_TOO_LARGE: 'RESOURCE',
+  EOUTPUT_TOO_LARGE: 'RESOURCE',
+  EINVAL: 'INVALID_ARGUMENT',
+  EINVALID_MANIFEST: 'INVALID_PATCH',
+  EPATCH: 'INVALID_PATCH',
+  ELEGACYFORMAT: 'INVALID_PATCH',
+  EBASELINEMISMATCH: 'VERIFICATION',
+  EPATCHMISMATCH: 'VERIFICATION',
+  ETARGETMISMATCH: 'VERIFICATION',
+  EDESTEXISTS: 'DESTINATION',
+  EUNSUPPORTED: 'UNSUPPORTED',
+};
+
+export function classifyPatchError(error: unknown): ClassifiedPatchError {
+  const code =
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof error.code === 'string'
+      ? error.code
+      : 'EUNSPECIFIED';
+  return {
+    category: ERROR_CATEGORIES[code] ?? 'RUNTIME',
+    code,
+    message: error instanceof Error ? error.message : String(error || ''),
+    retryable: code === 'EABORTED' || code === 'ECANCELLED',
+  };
 }
 
 type NativeProgressEvent = Omit<NativeOperationProgress, 'operation'>;
@@ -308,4 +375,35 @@ export function patchBytes(
   _options?: BinaryOperationOptions
 ): Promise<Uint8Array> {
   return rejectWebOnlyApi('patchBytes');
+}
+
+let unsupportedBinaryJobSequence = 0;
+
+function unsupportedBinaryJob(methodName: string): BinaryOperationJob {
+  return {
+    id: `bsdiffpatch-native-unsupported-${++unsupportedBinaryJobSequence}`,
+    result: rejectWebOnlyApi(methodName),
+    async cancel() {},
+    onProgress() {
+      return () => {};
+    },
+  };
+}
+
+/** Start a controllable binary diff on Web. */
+export function startDiffBytes(
+  _oldData: BinaryInput,
+  _newData: BinaryInput,
+  _options?: BinaryOperationOptions
+): BinaryOperationJob {
+  return unsupportedBinaryJob('startDiffBytes');
+}
+
+/** Start a controllable binary patch operation on Web. */
+export function startPatchBytes(
+  _oldData: BinaryInput,
+  _patchData: BinaryInput,
+  _options?: BinaryOperationOptions
+): BinaryOperationJob {
+  return unsupportedBinaryJob('startPatchBytes');
 }

@@ -1,7 +1,11 @@
 # API reference
 
-The package exposes two platform-specific API families from the same import
-path. Native runtimes use absolute paths; Web uses in-memory binary values.
+The package exposes two platform-specific API families. Existing shared code
+may import the root package and rely on its React Native/browser conditions;
+standalone browser and desktop WebView consumers should use the explicit ESM
+entry `react-native-bs-diff-patch/web`. Native runtimes use absolute paths; Web
+uses in-memory binary values. The platform-neutral manifest helpers live in
+the ESM entry `react-native-bs-diff-patch/toolkit`.
 
 ```ts
 import {
@@ -9,10 +13,13 @@ import {
   patch,
   startDiff,
   startPatch,
+  startDiffBytes,
+  startPatchBytes,
   diffBytes,
   patchBytes,
   inspectPatch,
   verifyPatch,
+  classifyPatchError,
   type BinaryInput,
   type BinaryOperationOptions,
   type PatchMetadata,
@@ -58,7 +65,7 @@ Reconstructs the target file at `outputFile`. Available on Android and iOS.
 - Resolves to `0` on success.
 - Rejects rather than overwriting an existing `outputFile`.
 
-## `startDiff` and `startPatch`
+## Native `startDiff` and `startPatch`
 
 ```ts
 interface NativeOperationOptions {
@@ -115,6 +122,7 @@ interface BinaryOperationOptions {
   signal?: AbortSignal;
   maxInputBytes?: number;
   maxOutputBytes?: number;
+  onProgress?: (event: BinaryOperationProgress) => void;
 }
 
 function diffBytes(
@@ -127,7 +135,10 @@ function diffBytes(
 Creates a binary patch in a Web Worker. Available on Web.
 
 - Accepts `ArrayBuffer`, any typed-array or `DataView`, and `Blob`.
-- Copies inputs, so buffers owned by the caller are not detached.
+- Zero-byte binary inputs are valid; native path APIs separately reject empty
+  path strings.
+- Preserves caller-owned buffers. `Blob` and `File` inputs are mounted
+  read-only through WORKERFS instead of being copied in full on the main thread.
 - Resolves to a new `Uint8Array` containing an `ENDSLEY/BSDIFF43` patch.
 - Checks each input against `maxInputBytes` and the generated patch against
   `maxOutputBytes` when those limits are configured.
@@ -146,7 +157,9 @@ Applies a compatible patch in a Web Worker and resolves to the reconstructed
 bytes. Available on Web.
 
 - Validates the patch header before invoking the WebAssembly core.
-- Copies inputs and resolves to a new `Uint8Array`.
+- An empty baseline or target buffer is valid when the patch format permits it;
+  malformed patch input is rejected.
+- Preserves inputs and resolves to a new `Uint8Array`.
 - Does not mutate `oldData` or `patchData`.
 - Rejects before allocating the declared output when the patch header exceeds
   `maxOutputBytes`.
@@ -236,6 +249,8 @@ byte-for-byte.
   dedicated Worker so aborting it cannot interrupt another request.
 - `maxInputBytes` limits each supplied binary input, not their sum.
 - `maxOutputBytes` limits the generated patch or restored output.
+- `onProgress` receives real `reading`, `processing`, and `writing` checkpoints
+  emitted by the C core.
 - Limits must be non-negative safe integers. Invalid limits reject with
   `EINVAL`; exceeded limits reject with `ERESOURCE`.
 
@@ -243,13 +258,44 @@ The binary APIs accept the options argument on native only to keep shared
 wrappers source-compatible, then reject with `EUNSUPPORTED` as usual. Native
 path operations use `startDiff` or `startPatch` for equivalent controls.
 
+## Web jobs
+
+On Web, `startDiff()` and `startPatch()` accept binary inputs and return a job
+whose result is `Promise<Uint8Array>`. `startDiffBytes()` and
+`startPatchBytes()` are explicit aliases for shared cross-platform wrappers.
+
+```ts
+const job = startPatchBytes(oldFile, patchFile, {
+  maxOutputBytes: 128 * 1024 * 1024,
+});
+
+const unsubscribe = job.onProgress(({ phase, progress }) => {
+  renderProgress(phase, progress);
+});
+
+try {
+  const restored = await job.result;
+  // await job.cancel();
+} finally {
+  unsubscribe();
+}
+```
+
+Job cancellation terminates only its dedicated Worker. `result` rejects with
+`EABORTED`, while `cancel()` resolves after that result reaches a terminal
+state and the Worker/listener cleanup has completed. Calling `cancel()` again
+after completion is safe and does not change the settled result. Progress is
+sourced from the C/WASM operation and never simulated.
+
 ## Availability behavior
 
 All functions remain exported so shared code has one stable import shape.
 Calling `diffBytes` or `patchBytes` on native rejects with `EUNSUPPORTED`.
-Calling `diff`, `patch`, `startDiff`, or `startPatch` on Web behaves the same
-way. `inspectPatch` and `verifyPatch` are available on every platform, but they
-require native paths on Android/iOS and binary values on Web.
+Calling `diff` or `patch` on Web rejects with `EUNSUPPORTED`; binary
+`startDiff` and `startPatch` are available. `startDiffBytes` and
+`startPatchBytes` reject on native. `inspectPatch` and `verifyPatch` are
+available on every platform, but require native paths on Android/iOS and binary
+values on Web.
 
 Importing the Web entry during server-side rendering does not start a Worker.
 Calling a binary API without browser Worker support rejects with
@@ -266,7 +312,7 @@ type PatchError = Error & { code?: string };
 
 | Code                | Meaning                                                     |
 | ------------------- | ----------------------------------------------------------- |
-| `EINVAL`            | Empty, duplicate, or invalid input.                         |
+| `EINVAL`            | Native empty/duplicate paths or invalid input/options; zero-byte binary inputs are valid. |
 | `ENOENT`            | A required native file does not exist.                      |
 | `EEXIST`            | A native output path already exists.                        |
 | `EUNSUPPORTED`      | The selected API is not available on the current platform.  |
@@ -284,6 +330,11 @@ type PatchError = Error & { code?: string };
 Treat error messages as diagnostic text rather than a stable machine-readable
 contract. Branch on `code` when recovery behavior differs.
 
+`classifyPatchError(error)` normalizes platform-specific codes into
+`ABORTED`, `RESOURCE`, `INVALID_ARGUMENT`, `INVALID_PATCH`, `VERIFICATION`,
+`DESTINATION`, `UNSUPPORTED`, or `RUNTIME`, while preserving the original
+code and message.
+
 Native validation stops before entering the C core. Web failures related to
 Worker startup, patch validation, or WebAssembly execution use
 `EWEBASSEMBLY` unless a more specific code is available.
@@ -300,5 +351,10 @@ for large browser inputs.
 
 ## Patch format
 
-All operations read or write `ENDSLEY/BSDIFF43` patches. Other bsdiff
-variants, such as patches beginning with `BSDIFF40`, are not interchangeable.
+Runtime operations read or write `ENDSLEY/BSDIFF43` patches. Other bsdiff
+variants are not accepted automatically. Convert existing `BSDIFF40` files
+offline with the Node CLI, then verify them before release:
+
+```sh
+npx react-native-bs-diff-patch convert legacy.patch -o compatible.patch
+```

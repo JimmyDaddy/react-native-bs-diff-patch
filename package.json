@@ -1,25 +1,51 @@
 {
   "name": "react-native-bs-diff-patch",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Create and apply compact binary patches across React Native Android, iOS, and Web",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "browser": "web/index.mjs",
   "types": "lib/typescript/src/index.d.ts",
+  "bin": "./bin/react-native-bs-diff-patch.mjs",
   "react-native": "src/index",
   "source": "src/index",
   "exports": {
     ".": {
-      "types": "./lib/typescript/src/index.d.ts",
+      "types": {
+        "react-native": "./lib/typescript/src/index.d.ts",
+        "browser": "./web/index.d.mts",
+        "default": "./lib/typescript/src/index.d.ts"
+      },
       "react-native": "./src/index.ts",
       "browser": "./web/index.mjs",
       "import": "./lib/module/index.js",
       "require": "./lib/commonjs/index.js",
       "default": "./lib/commonjs/index.js"
     },
+    "./web": {
+      "types": "./web/index.d.mts",
+      "import": "./web/index.mjs",
+      "default": "./web/index.mjs"
+    },
+    "./node": {
+      "types": "./node/index.d.ts",
+      "node": "./node/index.mjs",
+      "import": "./node/index.mjs",
+      "default": "./node/index.mjs"
+    },
+    "./toolkit": {
+      "types": "./toolkit/index.d.ts",
+      "import": "./toolkit/index.mjs",
+      "default": "./toolkit/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
+    "bin",
+    "action",
+    "action.yml",
+    "node",
+    "toolkit",
     "src",
     "lib",
     "android",
@@ -36,6 +62,8 @@
     "!lib/commonjs/index.web.js*",
     "!lib/module/index.web.js*",
     "!lib/typescript/src/index.web.d.ts*",
+    "!web/*.c",
+    "!web/*-pre.js",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
@@ -51,6 +79,10 @@
     "test:web:browser": "node scripts/test-web-browser.mjs",
     "test:web:metro": "node scripts/test-web-metro.mjs",
     "test:package": "node scripts/test-package-consumers.mjs",
+    "test:sdk": "node scripts/test-sdk-consumers.mjs",
+    "test:node": "node scripts/test-node-cli.mjs",
+    "test:toolkit": "node scripts/test-toolkit.mjs",
+    "test:action": "node scripts/test-action.mjs",
     "test:registry:vite": "node scripts/test-registry-consumers.mjs vite",
     "test:registry:expo": "node scripts/test-registry-consumers.mjs expo",
     "test:fuzz": "sh scripts/test-native-fuzz.sh",
@@ -66,7 +98,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bob build && node scripts/prepare-package.mjs",
+    "prepare": "bob build && node scripts/prepare-package.mjs && node scripts/check-package-contract.mjs",
+    "prepack": "node scripts/check-package-contract.mjs",
     "build:web": "bash scripts/build-web-wasm.sh",
     "release": "release-it"
   },
@@ -130,6 +163,9 @@
     "@react-native-community/cli-config/joi": "17.13.4",
     "@react-native-community/cli-doctor/yaml": "2.9.0",
     "@react-native-community/cli-types/joi": "17.13.4",
+    "brace-expansion@^1.1.7": "1.1.17",
+    "brace-expansion@^2.0.1": "2.1.3",
+    "brace-expansion@^5.0.5": "5.0.8",
     "cosmiconfig/yaml": "1.10.3",
     "eslint/ajv": "6.15.0",
     "fast-xml-parser": "5.10.1",
@@ -232,7 +268,8 @@
       [
         "typescript",
         {
-          "project": "tsconfig.build.json"
+          "project": "tsconfig.build.json",
+          "tsc": "node_modules/typescript/bin/tsc"
         }
       ]
     ]

@@ -55,6 +55,13 @@ file under the system temporary directory and removes it on every exit path.
 
 ## React Native Web
 
+Standalone browser and desktop WebView applications should import the
+explicit ESM entry `react-native-bs-diff-patch/web`. Its Worker graph uses the
+Node-free `web/bsdiffpatch.browser.mjs`; the `/toolkit` entry is also ESM-only.
+The root package's `browser` condition remains available for existing React
+Native Web consumers. See [Web and desktop WebView SDK](./web-sdk.md) for
+resource and CSP requirements.
+
 The package has two Web entry mechanisms:
 
 - `browser` points standard browser-aware bundlers to `web/index.mjs`.
@@ -73,15 +80,17 @@ Webpack and Vite understand the standard
 `new Worker(new URL(..., import.meta.url), { type: 'module' })` pattern. A Metro
 Web setup must preserve module-worker URLs in its Web serializer.
 
-The Web entry is browser-oriented rather than a Node.js filesystem adapter. It
-does not make the native file-path APIs available in Node.js.
-Native job functions remain exported for a stable import shape but reject with
-`EUNSUPPORTED` on Web.
+The Web entry is browser-oriented rather than a Node.js filesystem adapter.
+It does not make native file-path APIs available in the browser. `startDiff`
+and `startPatch` use binary inputs on Web; the separate package `./node` entry
+provides release-side filesystem operations.
 
 Calls without an `AbortSignal` share a module Worker and initialized
 WebAssembly module. Calls with a signal receive a dedicated Worker so
 cancellation is isolated to that operation. Both paths serialize work inside
 their Worker; callers should still enforce an application memory budget.
+`Blob` and `File` inputs use read-only WORKERFS mounts to avoid a full
+main-thread copy.
 `inspectPatch` does not start a Worker. `verifyPatch` first validates metadata,
 then uses the same Worker path as `patchBytes` and discards the restored buffer
 after comparing it with the expected input.
